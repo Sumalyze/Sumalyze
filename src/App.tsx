@@ -1,36 +1,55 @@
 import { useState, useEffect, useRef } from 'react';
 import { analyzeText } from './utils/mockAnalyzer';
 import type { AnalysisResult } from './utils/mockAnalyzer';
+import { AuthProvider, useAuth } from './hooks/useAuth';
+import AuthModal from './components/AuthModal';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 /* ============================================================
    REFLECT-IDENTICAL STRUCTURE — Sumalyze Branding
    ============================================================ */
 
+type Page = 'home' | 'privacy' | 'terms';
+
 export default function App() {
+  const [page, setPage] = useState<Page>('home');
+  const [authOpen, setAuthOpen] = useState(false);
+
+  // Scroll to top on page change
+  useEffect(() => { window.scrollTo(0, 0); }, [page]);
+
+  if (page === 'privacy') return <AuthProvider><PrivacyPolicy onClose={() => setPage('home')} /></AuthProvider>;
+  if (page === 'terms') return <AuthProvider><TermsOfService onClose={() => setPage('home')} /></AuthProvider>;
+
   return (
-    <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', overflowX: 'hidden', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-      <Header />
-      <Hero />
-      <TrustedBy />
-      <ProductSection />
-      <SuperpowerSection />
-      <ModulesSection />
-      <AISectionBlock />
-      <UseCasesSection />
-      <DonationSection />
-      <TestimonialsSection />
-      <FinalCTA />
-      <Footer />
-    </div>
+    <AuthProvider>
+      <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', overflowX: 'hidden', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
+        <Header onLoginClick={() => setAuthOpen(true)} />
+        <Hero />
+        <TrustedBy />
+        <ProductSection />
+        <SuperpowerSection />
+        <ModulesSection />
+        <AISectionBlock />
+        <UseCasesSection />
+        <DonationSection />
+        <TestimonialsSection />
+        <FinalCTA />
+        <Footer onNavigate={setPage} />
+        <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      </div>
+    </AuthProvider>
   );
 }
 
 /* ============================================================
    HEADER — Pill nav centered, logo left, login+cta right
    ============================================================ */
-function Header() {
+function Header({ onLoginClick }: { onLoginClick: () => void }) {
+  const { user, signOut } = useAuth();
   const [scrolled, setScrolled] = useState(false);
-
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 10);
@@ -38,28 +57,34 @@ function Header() {
     return () => window.removeEventListener('scroll', h);
   }, []);
 
+  const navLinks = [
+    { label: 'Features', href: '#features' },
+    { label: 'Demo', href: '#demo' },
+    { label: 'Modules', href: '#modules' },
+    { label: 'Mission', href: '#mission' },
+  ];
+
   return (
     <header style={{
       position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 100,
       padding: '0 20px',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      background: scrolled ? 'rgba(10,0,15,0.85)' : 'rgba(10,0,15,0.08)',
+      background: scrolled ? 'rgba(10,0,15,0.9)' : 'rgba(10,0,15,0.08)',
       transition: 'background 0.3s ease',
     }}>
-      <div style={{ maxWidth: 1248, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 0', position: 'relative' }}>
-        {/* Bottom border gradient */}
+      <div style={{ maxWidth: 1248, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 0', position: 'relative' }}>
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, background: 'radial-gradient(62.87% 100% at 50% 100%, rgba(226,62,87,0.15) 0%, transparent 100%)' }} />
 
         {/* Logo */}
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'white', zIndex: 2 }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 10,
+            width: 32, height: 32, borderRadius: 9,
             background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
             boxShadow: '0 4px 14px rgba(226,62,87,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
               <path d="M3 5h12M3 9h8M3 13h10" stroke="white" strokeWidth="1.75" strokeLinecap="round" />
               <circle cx="14" cy="13" r="2" fill="white" />
             </svg>
@@ -67,38 +92,112 @@ function Header() {
           <span style={{ fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em' }}>Sumalyze</span>
         </a>
 
-        {/* Center pill nav */}
+        {/* Center pill nav — desktop only */}
         <nav style={{
           position: 'absolute', left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(255,255,255,0.025)',
           border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 999, display: 'flex', padding: '10px 12px',
+          borderRadius: 999, display: 'flex', padding: '8px 12px',
         }} className="header-nav-desktop">
-          {[
-            { label: 'Features', href: '#features' },
-            { label: 'Demo', href: '#demo' },
-            { label: 'Modules', href: '#modules' },
-            { label: 'Mission', href: '#mission' },
-          ].map(l => (
-            <li key={l.label} style={{ listStyle: 'none', margin: '0 12px' }}>
-              <a href={l.href} style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', textDecoration: 'none', transition: 'color 0.2s', fontWeight: 500 }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.9)')}>
+          {navLinks.map(l => (
+            <li key={l.label} style={{ listStyle: 'none', margin: '0 10px' }}>
+              <a href={l.href} style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', textDecoration: 'none', transition: 'color 0.2s', fontWeight: 500 }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}>
                 {l.label}
               </a>
             </li>
           ))}
         </nav>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, zIndex: 2 }}>
-          <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', textDecoration: 'none', fontWeight: 500 }}>
-            Support Us
+        {/* Desktop actions */}
+        <div className="header-nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: 12, zIndex: 2 }}>
+          <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontWeight: 500 }}
+            onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,1)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}>
+            ♥ Support
           </a>
+          {user ? (
+            <button onClick={signOut} style={{
+              padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)',
+              fontFamily: 'inherit',
+            }}>
+              Sign Out
+            </button>
+          ) : (
+            <button onClick={onLoginClick} style={{
+              padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', border: '1px solid rgba(207,184,255,0.2)',
+              background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)',
+              boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)',
+              color: '#f4f0ff', fontFamily: 'inherit',
+            }}>
+              Sign In
+            </button>
+          )}
           <HeaderBtn href="#demo">Try Demo</HeaderBtn>
         </div>
+
+        {/* Mobile: hamburger */}
+        <button
+          className="header-mobile-only"
+          onClick={() => setMobileMenuOpen(o => !o)}
+          style={{
+            zIndex: 2, width: 36, height: 36, borderRadius: 9,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: 'white', fontSize: 16, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'inherit',
+          }}
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
       </div>
+
+      {/* Mobile menu dropdown */}
+      {mobileMenuOpen && (
+        <div style={{
+          background: 'rgba(10,0,15,0.97)',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: '16px 20px 20px',
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          {navLinks.map(l => (
+            <a
+              key={l.label}
+              href={l.href}
+              onClick={() => setMobileMenuOpen(false)}
+              style={{ padding: '10px 12px', borderRadius: 8, fontSize: 15, color: 'rgba(255,255,255,0.75)', fontWeight: 500, display: 'block' }}
+            >
+              {l.label}
+            </a>
+          ))}
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+          {user ? (
+            <button onClick={() => { signOut(); setMobileMenuOpen(false); }} style={{
+              padding: '10px 12px', borderRadius: 8, fontSize: 15,
+              color: 'rgba(255,255,255,0.5)', background: 'none',
+              border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontWeight: 500,
+            }}>
+              Sign Out
+            </button>
+          ) : (
+            <button onClick={() => { onLoginClick(); setMobileMenuOpen(false); }} style={{
+              padding: '12px', borderRadius: 10, fontSize: 14, fontWeight: 500,
+              cursor: 'pointer', border: 'none',
+              background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+              color: 'white', marginTop: 4, fontFamily: 'inherit',
+            }}>
+              Sign In / Create Account
+            </button>
+          )}
+        </div>
+      )}
     </header>
   );
 }
@@ -168,7 +267,7 @@ function Hero() {
             style={{ padding: '12px 24px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.2)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)', backdropFilter: 'blur(8px)' }}>
             Try Demo — free
           </button>
-          <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer"
+          <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
             style={{ padding: '12px 24px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(8px)' }}>
             ♥ Support on Ko-fi
           </a>
@@ -289,6 +388,8 @@ function BlackHole() {
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(50% 50% at 50% 50%, transparent 55%, #0a000f 85%)', zIndex: 2, pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 200, background: 'linear-gradient(to bottom, transparent, #0a000f)', zIndex: 3, pointerEvents: 'none' }} />
       <canvas ref={canvasRef} style={{ position: 'absolute', left: '50%', top: 0, transform: 'translateX(-50%)', opacity: 0.85 }} />
+      {/* Hide floating cards on small screens */}
+      <style>{`@media(max-width:768px){.floating-card{display:none!important}}`}</style>
 
       {/* Floating tooltip cards */}
       <FloatingCard top={120} left="calc(50% - 360px)" delay={0}>
@@ -325,7 +426,7 @@ function BlackHole() {
 
 function FloatingCard({ top, left, delay, children }: { top: number; left: string; delay: number; children: React.ReactNode }) {
   return (
-    <div style={{
+    <div className="floating-card" style={{
       position: 'absolute', top, left, zIndex: 5,
       display: 'flex', alignItems: 'center', gap: 10,
       background: 'rgba(10,0,15,0.7)', backdropFilter: 'blur(16px)',
@@ -426,14 +527,59 @@ function DemoPanel() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [tab, setTab] = useState<'paste' | 'upload'>('paste');
+  const [error, setError] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const analyze = async () => {
     if (!text.trim()) return;
+    if (text.trim().length < 10) {
+      setError('Please enter at least 10 characters to analyze.');
+      return;
+    }
     setLoading(true);
     setResult(null);
-    await new Promise(r => setTimeout(r, 1600));
-    setResult(analyzeText(text));
-    setLoading(false);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 1400));
+      setResult(analyzeText(text));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Analysis failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = (file: File) => {
+    const supportedTypes = ['text/plain'];
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    if (!supportedTypes.includes(file.type) && ext !== 'txt') {
+      setError(`Unsupported file type: .${ext}. Please upload a .txt file. PDF and DOCX support coming soon.`);
+      return;
+    }
+    if (file.size > 500_000) {
+      setError('File too large. Maximum size is 500KB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setText(content);
+      setUploadedFileName(file.name);
+      setTab('paste'); // switch to paste view to show the text
+      setResult(null);
+      setError(null);
+    };
+    reader.onerror = () => setError('Could not read file. Please try again.');
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
   };
 
   const samples = [
@@ -441,6 +587,8 @@ function DemoPanel() {
     { label: 'Urgent escalation', text: "This is critical — if we don't resolve this today the client will cancel the contract." },
     { label: 'Scam attempt', text: "Congratulations! You've been selected for a $5,000 grant. Send your bank details and $150 processing fee immediately." },
   ];
+
+  const canAnalyze = text.trim().length >= 10 && !loading;
 
   return (
     <div id="demo" style={{ marginTop: 80 }}>
@@ -451,7 +599,7 @@ function DemoPanel() {
       {/* Sample chips */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '24px 0' }}>
         {samples.map(s => (
-          <button key={s.label} onClick={() => { setText(s.text); setTab('paste'); setResult(null); }}
+          <button key={s.label} onClick={() => { setText(s.text); setTab('paste'); setResult(null); setError(null); setUploadedFileName(null); }}
             style={{ padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
             onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
@@ -463,33 +611,69 @@ function DemoPanel() {
       {/* Panel */}
       <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}>
         {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 4, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
           {(['paste', 'upload'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
+            <button key={t} onClick={() => { setTab(t); setError(null); }}
               style={{ padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: tab === t ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent', background: tab === t ? 'rgba(226,62,87,0.1)' : 'transparent', color: tab === t ? '#ff8fa3' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }}>
               {t === 'paste' ? '📋 Paste Text' : '📎 Upload File'}
             </button>
           ))}
-          {text && (
-            <button onClick={() => { setText(''); setResult(null); }} style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
+          {(text || uploadedFileName) && (
+            <button onClick={() => { setText(''); setResult(null); setError(null); setUploadedFileName(null); }} style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
           )}
         </div>
 
         <div style={{ padding: '20px' }}>
           {tab === 'paste' ? (
-            <textarea value={text} onChange={e => setText(e.target.value)}
-              placeholder="Paste an email, message, contract snippet, or any text you want to analyze..."
-              style={{ width: '100%', height: 180, background: 'rgba(10,0,15,0.6)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 16, fontSize: 14, color: 'rgba(255,255,255,0.8)', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: '22px', boxSizing: 'border-box' }} />
+            <div style={{ position: 'relative' }}>
+              {uploadedFileName && (
+                <div style={{ marginBottom: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 12, color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  📄 {uploadedFileName} · {text.length.toLocaleString()} characters loaded
+                </div>
+              )}
+              <textarea value={text} onChange={e => { setText(e.target.value); setError(null); }}
+                placeholder="Paste an email, message, contract snippet, or any text you want to analyze..."
+                style={{ width: '100%', height: 180, background: 'rgba(10,0,15,0.6)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 16, fontSize: 14, color: 'rgba(255,255,255,0.8)', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: '22px', boxSizing: 'border-box' }}
+                onFocus={e => e.target.style.borderColor = 'rgba(226,62,87,0.3)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <span style={{ fontSize: 11, color: text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
+                  {text.length} chars {text.length > 0 && text.length < 10 ? '(min 10)' : ''}
+                </span>
+              </div>
+            </div>
           ) : (
-            <div style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', background: 'rgba(10,0,15,0.4)' }}>
+            <div
+              onDrop={handleDrop}
+              onDragOver={e => e.preventDefault()}
+              onClick={() => fileInputRef.current?.click()}
+              style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'}
+            >
               <span style={{ fontSize: 32 }}>📄</span>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop file here or click to browse</p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>TXT · PDF · DOCX</p>
+              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop .txt file here or click to browse</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>TXT supported · PDF & DOCX coming soon</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,text/plain"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+              />
             </div>
           )}
 
-          <button onClick={analyze} disabled={loading || !text.trim()}
-            style={{ width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500, cursor: loading || !text.trim() ? 'not-allowed' : 'pointer', border: 'none', background: loading || !text.trim() ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', color: loading || !text.trim() ? 'rgba(255,255,255,0.25)' : 'white', boxShadow: loading || !text.trim() ? 'none' : '0 4px 24px rgba(226,62,87,0.35)', transition: 'all 0.25s' }}>
+          {/* Error message */}
+          {error && (
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 8 }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          <button onClick={analyze} disabled={!canAnalyze}
+            style={{ width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500, cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none', background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white', boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)', transition: 'all 0.25s', fontFamily: 'inherit' }}>
             {loading ? '⏳ Analyzing...' : '⚡ Analyze with Sumalyze'}
           </button>
         </div>
@@ -722,7 +906,7 @@ function AISectionBlock() {
               <a href="#demo" style={{ padding: '10px 22px', borderRadius: 10, fontSize: 14, fontWeight: 500, color: '#f4f0ff', textDecoration: 'none', background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', boxShadow: '0 4px 20px rgba(226,62,87,0.3)' }}>
                 Try Demo →
               </a>
-              <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" style={{ padding: '10px 22px', borderRadius: 10, fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ padding: '10px 22px', borderRadius: 10, fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)' }}>
                 ♥ Support Us
               </a>
             </div>
@@ -828,7 +1012,7 @@ function DonationSection() {
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)' }}>{f}</span>
               </div>
             ))}
-            <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer"
+            <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
               style={{ display: 'block', marginTop: 28, padding: '12px', borderRadius: 12, fontSize: 14, fontWeight: 500, color: 'white', textDecoration: 'none', background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', boxShadow: '0 4px 24px rgba(226,62,87,0.35)', textAlign: 'center' }}>
               Support on Ko-fi →
             </a>
@@ -902,7 +1086,7 @@ function FinalCTA() {
           <a href="#demo" style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: '#f4f0ff', textDecoration: 'none', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)', border: '1px solid rgba(207,184,255,0.2)', backdropFilter: 'blur(8px)' }}>
             Try Demo — it's free
           </a>
-          <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
+          <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
             ♥ Support on Ko-fi
           </a>
         </div>
@@ -914,7 +1098,7 @@ function FinalCTA() {
 /* ============================================================
    FOOTER
    ============================================================ */
-function Footer() {
+function Footer({ onNavigate }: { onNavigate: (page: 'privacy' | 'terms') => void }) {
   return (
     <footer style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '48px 20px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -936,10 +1120,30 @@ function Footer() {
           </div>
 
           {/* Nav columns */}
-          <div style={{ display: 'flex', gap: 64, flexWrap: 'wrap' }}>
-            <FooterCol label="Product" links={[{ l: 'Features', h: '#features' }, { l: 'Demo', h: '#demo' }, { l: 'Modules', h: '#modules' }]} />
-            <FooterCol label="Mission" links={[{ l: 'Nonprofit', h: '#mission' }, { l: 'Ko-fi', h: 'https://ko-fi.com' }, { l: 'Contact', h: 'mailto:hello@sumalyze.com' }]} />
-            <FooterCol label="Legal" links={[{ l: 'Privacy', h: '#' }, { l: 'Terms', h: '#' }]} />
+          <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
+            <FooterCol label="Product" links={[
+              { l: 'Features', h: '#features' },
+              { l: 'Demo', h: '#demo' },
+              { l: 'Modules', h: '#modules' },
+            ]} />
+            <FooterCol label="Mission" links={[
+              { l: 'Nonprofit', h: '#mission' },
+              { l: 'Support on Ko-fi', h: 'https://ko-fi.com/sumalyze' },
+              { l: 'Contact', h: 'mailto:hello@sumalyze.com' },
+            ]} />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Legal</p>
+              <button onClick={() => onNavigate('privacy')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Privacy Policy
+              </button>
+              <button onClick={() => onNavigate('terms')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Terms of Service
+              </button>
+            </div>
           </div>
         </div>
 
@@ -957,7 +1161,10 @@ function FooterCol({ label, links }: { label: string; links: { l: string; h: str
     <div>
       <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>{label}</p>
       {links.map(link => (
-        <a key={link.l} href={link.h} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', marginBottom: 10, transition: 'color 0.2s' }}
+        <a key={link.l} href={link.h}
+          target={link.h.startsWith('http') ? '_blank' : undefined}
+          rel={link.h.startsWith('http') ? 'noopener noreferrer' : undefined}
+          style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', marginBottom: 10, transition: 'color 0.2s' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
           {link.l}

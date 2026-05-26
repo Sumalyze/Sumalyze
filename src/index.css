@@ -119,6 +119,15 @@
   .header-nav-desktop {
     display: none !important;
   }
+  .header-mobile-only {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .header-mobile-only {
+    display: none !important;
+  }
 }
 
 /* ─── Responsive grid fixes ───────────────────────────────── */
