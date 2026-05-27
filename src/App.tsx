@@ -189,6 +189,15 @@ function Header({ onLoginClick }: { onLoginClick: () => void }) {
               {l.label}
             </a>
           ))}
+          <a
+            href="https://ko-fi.com/sumalyze"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{ padding: '10px 12px', borderRadius: 8, fontSize: 15, color: '#ff8fa3', fontWeight: 600, display: 'block' }}
+          >
+            ♥ Support Sumalyze
+          </a>
           <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
           {user ? (
             <button onClick={() => { signOut(); setMobileMenuOpen(false); }} style={{
@@ -217,6 +226,7 @@ function Header({ onLoginClick }: { onLoginClick: () => void }) {
 function HeaderBtn({ href, children, onClick }: { href?: string; children: React.ReactNode; onClick?: () => void }) {
   return (
     <a href={href} onClick={onClick}
+      className="hover-glow"
       style={{
         display: 'block', padding: '8px 16px', borderRadius: 8, fontSize: 14, fontWeight: 500, color: '#f4f0ff',
         textDecoration: 'none', position: 'relative',
@@ -243,13 +253,13 @@ function Hero() {
   };
 
   return (
-    <section style={{ paddingTop: 160, position: 'relative', textAlign: 'center' }}>
+    <section style={{ paddingTop: 'clamp(100px, 12vw, 160px)', position: 'relative', textAlign: 'center' }}>
       {/* Background radial glow */}
       <div style={{ position: 'absolute', top: -173, left: '50%', transform: 'translateX(-50%)', width: 1440, height: 900, background: 'radial-gradient(37.74% 81.78% at 50% 26.56%, rgba(226,62,87,0.07) 0%, rgba(10,0,15,0) 100%)', pointerEvents: 'none', zIndex: 1 }} />
 
       <div style={{ position: 'relative', zIndex: 2, maxWidth: 800, margin: '0 auto', padding: '0 20px' }}>
         {/* AI Badge */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '0 auto 20px', padding: '5px 14px 5px 10px', borderRadius: 32,
+        <div className="animate-reveal" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, margin: '0 auto 20px', padding: '5px 14px 5px 10px', borderRadius: 32,
           backdropFilter: 'blur(6px)', boxShadow: 'inset 0 -7px 11px rgba(226,62,87,0.12)',
           border: '1px solid rgba(226,62,87,0.25)', background: 'rgba(226,62,87,0.06)' }}>
           <SparkleIcon />
@@ -259,7 +269,7 @@ function Hero() {
         </div>
 
         {/* Title */}
-        <h1 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(44px, 7vw, 72px)', lineHeight: '1.1', letterSpacing: '-0.03em', margin: '0 0 16px' }}>
+        <h1 className="animate-reveal delay-75" style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(34px, 7vw, 72px)', lineHeight: '1.1', letterSpacing: '-0.03em', margin: '0 0 16px' }}>
           <span style={{ background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', display: 'block' }}>
             Understand any message
           </span>
@@ -269,23 +279,25 @@ function Hero() {
         </h1>
 
         {/* Subtitle */}
-        <p style={{ fontSize: 18, lineHeight: '28px', color: 'rgba(239,237,253,0.7)', margin: '0 auto 40px', maxWidth: 480 }}>
+        <p className="animate-reveal delay-150" style={{ fontSize: 18, lineHeight: '28px', color: 'rgba(239,237,253,0.7)', margin: '0 auto 40px', maxWidth: 480 }}>
           Summarize text, detect tone, find intent, highlight emotional signals, and reply smarter — free, always.
         </p>
 
         {/* CTA Buttons */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+        <div className="animate-reveal delay-200 hero-buttons" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
           <button onClick={scrollToDemo}
+            className="hover-glow"
             style={{ padding: '12px 24px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.2)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)', backdropFilter: 'blur(8px)' }}>
             Try Demo — free
           </button>
           <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
+            className="hover-glow"
             style={{ padding: '12px 24px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.7)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(8px)' }}>
-            ♥ Support on Ko-fi
+            Support on Ko-fi
           </a>
         </div>
 
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 0 }}>
+        <p className="animate-reveal delay-300" style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 0 }}>
           100% free · No sign-up required · Nonprofit
         </p>
       </div>
@@ -399,7 +411,8 @@ function BlackHole() {
       {/* Mask fade */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(50% 50% at 50% 50%, transparent 55%, #0a000f 85%)', zIndex: 2, pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 200, background: 'linear-gradient(to bottom, transparent, #0a000f)', zIndex: 3, pointerEvents: 'none' }} />
-      <canvas ref={canvasRef} style={{ position: 'absolute', left: '50%', top: 0, transform: 'translateX(-50%)', opacity: 0.85 }} />
+      <canvas ref={canvasRef} className="black-hole-canvas" style={{ position: 'absolute', left: '50%', top: 0, transform: 'translateX(-50%)', opacity: 0.85 }} />
+      <div className="black-hole-mobile-glow" />
       {/* Hide floating cards on small screens */}
       <style>{`@media(max-width:768px){.floating-card{display:none!important}}`}</style>
 
@@ -519,7 +532,7 @@ function ProductSection() {
 
 function FeatureCard({ num, title, desc, accent }: { num: string; title: string; desc: string; accent: string }) {
   return (
-    <div style={{
+    <div className="hover-card" style={{
       background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
       borderRadius: 16, padding: '28px 24px', position: 'relative', overflow: 'hidden',
     }}>
@@ -748,14 +761,23 @@ function DemoPanel() {
             </div>
           )}
           <button onClick={analyze} disabled={!canAnalyze}
-            style={{ width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500, cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none', background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white', boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)', transition: 'all 0.25s', fontFamily: 'inherit' }}>
-            {loading ? '⏳ Analyzing...' : '⚡ Analyze with Sumalyze'}
+            style={{
+              width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500,
+              cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none',
+              background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+              color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white',
+              boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
+              transition: 'all 0.25s', fontFamily: 'inherit',
+              animation: loading ? 'premiumPulse 1.5s ease-in-out infinite' : 'none'
+            }}>
+            {loading ? '⏳ Analyzing with AI...' : '⚡ Analyze with Sumalyze'}
           </button>
         </div>
 
         {/* Results */}
         {result && <ResultGrid result={result} />}
         {result && <FeedbackWidget key={result.brief} />}
+        {result && <ResultKoFiCTA />}
       </div>
     </div>
   );
@@ -781,6 +803,51 @@ function FeedbackWidget() {
           ))}
         </>
       )}
+    </div>
+  );
+}
+
+function ResultKoFiCTA() {
+  return (
+    <div className="animate-reveal" style={{ padding: '0 20px 24px' }}>
+      <div style={{
+        background: 'linear-gradient(145deg, rgba(226,62,87,0.12) 0%, rgba(136,48,78,0.08) 100%)',
+        border: '1px solid rgba(226,62,87,0.25)',
+        borderRadius: 16,
+        padding: '20px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+        boxShadow: 'inset 0 0 12px rgba(226,62,87,0.12)',
+      }}>
+        <div style={{ flex: '1 1 300px' }}>
+          <p style={{ fontSize: 14, fontWeight: 500, color: 'white', marginBottom: 4 }}>
+            ♥ Find this analysis helpful?
+          </p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: '18px' }}>
+            Sumalyze is completely free and run by a nonprofit. A small Ko-fi donation helps keep the servers running.
+          </p>
+        </div>
+        <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
+          className="hover-glow"
+          style={{
+            padding: '10px 20px',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'white',
+            textDecoration: 'none',
+            background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+            boxShadow: '0 4px 14px rgba(226,62,87,0.3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+          ☕ Support Us on Ko-fi
+        </a>
+      </div>
     </div>
   );
 }
@@ -870,7 +937,7 @@ function ResultGrid({ result }: { result: AnalysisResult }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
         {cards.map((card, i) => (
-          <div key={card.id} id={`result-${card.id}`} style={{
+          <div key={card.id} id={`result-${card.id}`} className="hover-card" style={{
             background: `${card.color}08`, border: `1px solid ${card.color}18`, borderRadius: 16, padding: '16px',
             animation: `fadeUp 0.4s ease ${i * 0.05}s both`,
           }}>

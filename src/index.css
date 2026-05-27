@@ -93,6 +93,11 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes shimmer {
   0%   { background-position: -200% center; }
   100% { background-position:  200% center; }
@@ -112,6 +117,57 @@
 @keyframes pulseRing {
   0%, 100% { opacity: 0.3; }
   50%      { opacity: 0.7; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+  50%      { transform: translate(-50%, -50%) scale(1.15); opacity: 0.95; }
+}
+
+@keyframes premiumPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.85; }
+}
+
+/* ─── Premium Animation Utilities ─────────────────────────── */
+.animate-reveal {
+  animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.delay-75 { animation-delay: 75ms; }
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+.transition-premium {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hover-glow {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-glow:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 12px 32px rgba(226, 62, 87, 0.28);
+}
+
+.hover-card {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(226, 62, 87, 0.25) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(226, 62, 87, 0.08);
+}
+
+/* Prevent unwanted automatic zoom on iPhone in Safari */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
 }
 
 /* ─── Nav desktop only ────────────────────────────────────── */
@@ -134,5 +190,51 @@
 @media (max-width: 640px) {
   .hero-buttons {
     flex-direction: column;
+    width: 100%;
+    align-items: stretch;
+  }
+  .hero-buttons > * {
+    width: 100%;
+    text-align: center;
   }
 }
+
+/* ─── Performance & Mobile adjustments ─────────────────────── */
+@media (max-width: 767px) {
+  .black-hole-canvas {
+    display: none !important;
+  }
+  .black-hole-mobile-glow {
+    display: block !important;
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(226, 62, 87, 0.35) 0%, rgba(136, 48, 78, 0.12) 50%, transparent 70%);
+    filter: blur(16px);
+    animation: pulseGlow 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .black-hole-mobile-glow {
+    display: none !important;
+  }
+}
+
+/* ─── Accessibility: Reduced Motion ────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+    transform: none !important;
+  }
+}
+
