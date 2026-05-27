@@ -535,6 +535,7 @@ function FeatureCard({ num, title, desc, accent }: { num: string; title: string;
    DEMO PANEL
    ============================================================ */
 const GUEST_DAILY_LIMIT = 10;
+const MAX_TEXT = 5000;
 function _getUsageToday(): number {
   try {
     const key = `sz_usage_${new Date().toDateString()}`;
@@ -564,6 +565,10 @@ function DemoPanel() {
     if (!text.trim()) return;
     if (text.trim().length < 10) {
       setError('Please enter at least 10 characters to analyze.');
+      return;
+    }
+    if (text.trim().length > MAX_TEXT) {
+      setError(`Text too long. Maximum is ${MAX_TEXT.toLocaleString()} characters.`);
       return;
     }
     if (isLimitReached) return;
@@ -620,7 +625,7 @@ function DemoPanel() {
     { label: 'Scam attempt', text: "Congratulations! You've been selected for a $5,000 grant. Send your bank details and $150 processing fee immediately." },
   ];
 
-  const canAnalyze = text.trim().length >= 10 && !loading && !isLimitReached;
+  const canAnalyze = text.trim().length >= 10 && text.trim().length <= MAX_TEXT && !loading && !isLimitReached;
 
   return (
     <div id="demo" style={{ marginTop: 80 }}>
@@ -670,8 +675,8 @@ function DemoPanel() {
                 onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                <span style={{ fontSize: 11, color: text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
-                  {text.length} chars {text.length > 0 && text.length < 10 ? '(min 10)' : ''}
+                <span style={{ fontSize: 11, color: text.length > MAX_TEXT ? '#fca5a5' : text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
+                  {text.length.toLocaleString()} / {MAX_TEXT.toLocaleString()}{text.length > 0 && text.length < 10 ? ' · min 10' : text.length > MAX_TEXT ? ' · too long' : ''}
                 </span>
               </div>
             </div>
@@ -717,7 +722,32 @@ function DemoPanel() {
 
         {/* Results */}
         {result && <ResultGrid result={result} />}
+        {result && <FeedbackWidget key={result.brief} />}
       </div>
+    </div>
+  );
+}
+
+function FeedbackWidget() {
+  const [voted, setVoted] = useState<'up' | 'down' | null>(null);
+  return (
+    <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+      {voted ? (
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Thanks for your feedback! ♥</span>
+      ) : (
+        <>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Was this analysis useful?</span>
+          {(['up', 'down'] as const).map(v => (
+            <button key={v} onClick={() => setVoted(v)}
+              style={{ padding: '5px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit', transition: 'all 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = v === 'up' ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = v === 'up' ? 'rgba(52,211,153,0.3)' : 'rgba(239,68,68,0.3)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+            >
+              {v === 'up' ? '👍 Yes' : '👎 No'}
+            </button>
+          ))}
+        </>
+      )}
     </div>
   );
 }

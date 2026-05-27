@@ -7,8 +7,8 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const { signIn, signUp, resetPassword } = useAuth();
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     setLoading(true);
     try {
-      if (mode === 'login') {
+      if (mode === 'forgot') {
+        const { error } = await resetPassword(email);
+        if (error) {
+          setError(error.message || 'Could not send reset email.');
+        } else {
+          setSuccess('Password reset email sent. Check your inbox.');
+        }
+      } else if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (error) {
           setError(error.message || 'Invalid email or password.');
@@ -136,37 +143,41 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         {/* Title */}
         <h2 style={{ fontSize: 22, fontWeight: 500, color: 'white', letterSpacing: '-0.02em', marginBottom: 6 }}>
-          {mode === 'login' ? 'Welcome back' : 'Create account'}
+          {mode === 'login' ? 'Welcome back' : mode === 'forgot' ? 'Reset password' : 'Create account'}
         </h2>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 28 }}>
           {mode === 'login'
             ? 'Sign in to your Sumalyze account'
+            : mode === 'forgot'
+            ? 'Enter your email and we\'ll send a reset link'
             : 'Free forever — no credit card required'}
         </p>
 
-        {/* Mode tabs */}
-        <div style={{
-          display: 'flex', gap: 4,
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 10, padding: 4, marginBottom: 24,
-        }}>
-          {(['login', 'signup'] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(null); setSuccess(null); }}
-              style={{
-                flex: 1, padding: '8px', borderRadius: 7, fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', transition: 'all 0.2s',
-                background: mode === m ? 'rgba(226,62,87,0.15)' : 'transparent',
-                border: mode === m ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent',
-                color: mode === m ? '#ff8fa3' : 'rgba(255,255,255,0.45)',
-              }}
-            >
-              {m === 'login' ? 'Sign In' : 'Sign Up'}
-            </button>
-          ))}
-        </div>
+        {/* Mode tabs — only login/signup */}
+        {mode !== 'forgot' && (
+          <div style={{
+            display: 'flex', gap: 4,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 10, padding: 4, marginBottom: 24,
+          }}>
+            {(['login', 'signup'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setError(null); setSuccess(null); }}
+                style={{
+                  flex: 1, padding: '8px', borderRadius: 7, fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  background: mode === m ? 'rgba(226,62,87,0.15)' : 'transparent',
+                  border: mode === m ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent',
+                  color: mode === m ? '#ff8fa3' : 'rgba(255,255,255,0.45)',
+                }}
+              >
+                {m === 'login' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -185,20 +196,49 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             />
           </div>
 
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={mode === 'signup' ? 'Min. 6 characters' : '••••••••'}
-              style={inputStyle}
-              onFocus={e => e.currentTarget.style.borderColor = 'rgba(226,62,87,0.4)'}
-              onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
-            />
-          </div>
+          {/* Password — hidden in forgot mode */}
+          {mode !== 'forgot' && (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={mode === 'signup' ? 'Min. 6 characters' : '••••••••'}
+                style={inputStyle}
+                onFocus={e => e.currentTarget.style.borderColor = 'rgba(226,62,87,0.4)'}
+                onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
+              />
+            </div>
+          )}
+
+          {/* Forgot password link */}
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); setError(null); setSuccess(null); }}
+              style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, fontFamily: 'inherit' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#ff8fa3'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
+            >
+              Forgot password?
+            </button>
+          )}
+
+          {/* Back link in forgot mode */}
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(null); setSuccess(null); }}
+              style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, fontFamily: 'inherit' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#ff8fa3'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
+            >
+              ← Back to sign in
+            </button>
+          )}
 
           {/* Error message */}
           {error && (
@@ -245,7 +285,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               transition: 'all 0.25s',
             }}
           >
-            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In →' : 'Create Account →'}
+            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In →' : mode === 'forgot' ? 'Send Reset Email →' : 'Create Account →'}
           </button>
         </form>
 
