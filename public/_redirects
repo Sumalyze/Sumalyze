@@ -1,0 +1,5 @@
+# Netlify Redirects — Sumalyze
+# API function proxy
+/api/analyze  /.netlify/functions/analyze  200
+# SPA fallback — must be last
+/*            /index.html                  200
