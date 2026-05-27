@@ -572,20 +572,53 @@ function DemoPanel() {
       return;
     }
     if (isLimitReached) return;
+
     setLoading(true);
     setResult(null);
     setError(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     try {
-      await new Promise(r => setTimeout(r, 1400));
-      setResult(analyzeText(text));
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.status === 404) {
+        // Local dev: API route not running — use client-side mock
+        setResult(analyzeText(text));
+      } else if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || 'Analysis failed. Please try again.');
+      } else {
+        const data = await res.json() as AnalysisResult;
+        setResult(data);
+      }
+
       _incrementUsage();
       setUsageCount(_getUsageToday());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Analysis failed. Please try again.');
+      clearTimeout(timeoutId);
+      if (e instanceof Error) {
+        if (e.name === 'AbortError') {
+          setError('Analysis timed out. Please try a shorter text.');
+        } else {
+          setError(e.message || 'Analysis failed. Please try again.');
+        }
+      } else {
+        setError('Analysis failed. Please check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleFileUpload = (file: File) => {
     const supportedTypes = ['text/plain'];
