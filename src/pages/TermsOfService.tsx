@@ -46,7 +46,7 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
             Terms of Service
           </h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.4)' }}>
-            Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            Last updated: May 27, 2026
           </p>
         </div>
 
@@ -84,12 +84,13 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
           <Section title="Your Content">
             <p>
               Text you submit for analysis is yours. We do not claim ownership of your content. We do not store your submitted text on our servers (see our{' '}
-              <button
-                onClick={onClose}
-                style={{ color: '#ff8fa3', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}
+              <a
+                href="#privacy"
+                onClick={() => { window.location.hash = 'privacy'; }}
+                style={{ color: '#ff8fa3', cursor: 'pointer' }}
               >
                 Privacy Policy
-              </button>
+              </a>
               ).
             </p>
             <p>
@@ -118,7 +119,7 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
           <Section title="Accounts">
             <p>
               If you create an account, you are responsible for keeping your credentials secure. You agree to notify us immediately at{' '}
-              <a href="mailto:hello@sumalyze.com" style={{ color: '#ff8fa3' }}>hello@sumalyze.com</a>{' '}
+              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>{' '}
               of any unauthorized access.
             </p>
             <p>
@@ -141,14 +142,14 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
           <Section title="Governing Law">
             <p>
               These terms are governed by applicable law. Any disputes shall be resolved through good-faith negotiation. Contact us first at{' '}
-              <a href="mailto:hello@sumalyze.com" style={{ color: '#ff8fa3' }}>hello@sumalyze.com</a>.
+              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>.
             </p>
           </Section>
 
           <Section title="Contact">
             <p>
               Questions about these terms? Email{' '}
-              <a href="mailto:hello@sumalyze.com" style={{ color: '#ff8fa3' }}>hello@sumalyze.com</a>
+              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>
             </p>
           </Section>
 

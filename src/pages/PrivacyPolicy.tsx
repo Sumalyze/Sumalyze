@@ -46,7 +46,7 @@ export default function PrivacyPolicy({ onClose }: { onClose: () => void }) {
             Privacy Policy
           </h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.4)' }}>
-            Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            Last updated: May 27, 2026
           </p>
         </div>
 
@@ -117,7 +117,7 @@ export default function PrivacyPolicy({ onClose }: { onClose: () => void }) {
             </ul>
             <p style={{ marginTop: 16 }}>
               To exercise these rights, contact us at{' '}
-              <a href="mailto:hello@sumalyze.com" style={{ color: '#ff8fa3' }}>hello@sumalyze.com</a>.
+              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>.
             </p>
           </Section>
 
@@ -132,7 +132,7 @@ export default function PrivacyPolicy({ onClose }: { onClose: () => void }) {
           <Section title="Contact">
             <p>
               Questions? Email us at{' '}
-              <a href="mailto:hello@sumalyze.com" style={{ color: '#ff8fa3' }}>hello@sumalyze.com</a>
+              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>
             </p>
           </Section>
 

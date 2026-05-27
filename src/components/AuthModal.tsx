@@ -88,14 +88,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         top: '50%', left: '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 1000,
-        width: '100%', maxWidth: 420,
-        margin: '0 16px',
+        width: 'calc(100% - 32px)', maxWidth: 420,
         background: 'rgba(14,4,22,0.97)',
         border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: 20,
-        padding: '36px 32px',
+        padding: '36px 28px',
         boxShadow: '0 32px 80px rgba(0,0,0,0.8)',
         animation: 'fadeUp 0.25s ease',
+        boxSizing: 'border-box',
       }}>
         {/* Top gradient accent */}
         <div style={{

@@ -7,7 +7,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
 /* ============================================================
-   REFLECT-IDENTICAL STRUCTURE — Sumalyze Branding
+   Sumalyze — MVP App
    ============================================================ */
 
 type Page = 'home' | 'privacy' | 'terms';
@@ -16,11 +16,23 @@ export default function App() {
   const [page, setPage] = useState<Page>('home');
   const [authOpen, setAuthOpen] = useState(false);
 
-  // Scroll to top on page change
+  // Hash-based routing — back button and direct links (#privacy, #terms) work
+  useEffect(() => {
+    const readHash = () => {
+      const h = window.location.hash.replace('#', '');
+      setPage(h === 'privacy' ? 'privacy' : h === 'terms' ? 'terms' : 'home');
+    };
+    readHash();
+    window.addEventListener('hashchange', readHash);
+    return () => window.removeEventListener('hashchange', readHash);
+  }, []);
+
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
 
-  if (page === 'privacy') return <AuthProvider><PrivacyPolicy onClose={() => setPage('home')} /></AuthProvider>;
-  if (page === 'terms') return <AuthProvider><TermsOfService onClose={() => setPage('home')} /></AuthProvider>;
+  const navigate = (p: Page) => { window.location.hash = p === 'home' ? '' : p; };
+
+  if (page === 'privacy') return <AuthProvider><PrivacyPolicy onClose={() => navigate('home')} /></AuthProvider>;
+  if (page === 'terms') return <AuthProvider><TermsOfService onClose={() => navigate('home')} /></AuthProvider>;
 
   return (
     <AuthProvider>
@@ -36,7 +48,7 @@ export default function App() {
         <DonationSection />
         <TestimonialsSection />
         <FinalCTA />
-        <Footer onNavigate={setPage} />
+        <Footer onNavigate={navigate} />
         <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
       </div>
     </AuthProvider>
@@ -522,14 +534,31 @@ function FeatureCard({ num, title, desc, accent }: { num: string; title: string;
 /* ============================================================
    DEMO PANEL
    ============================================================ */
+const GUEST_DAILY_LIMIT = 10;
+function _getUsageToday(): number {
+  try {
+    const key = `sz_usage_${new Date().toDateString()}`;
+    return parseInt(localStorage.getItem(key) ?? '0', 10);
+  } catch { return 0; }
+}
+function _incrementUsage() {
+  try {
+    const key = `sz_usage_${new Date().toDateString()}`;
+    localStorage.setItem(key, String(_getUsageToday() + 1));
+  } catch {}
+}
+
 function DemoPanel() {
+  const { user } = useAuth();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [tab, setTab] = useState<'paste' | 'upload'>('paste');
   const [error, setError] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [usageCount, setUsageCount] = useState(_getUsageToday);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isLimitReached = !user && usageCount >= GUEST_DAILY_LIMIT;
 
   const analyze = async () => {
     if (!text.trim()) return;
@@ -537,12 +566,15 @@ function DemoPanel() {
       setError('Please enter at least 10 characters to analyze.');
       return;
     }
+    if (isLimitReached) return;
     setLoading(true);
     setResult(null);
     setError(null);
     try {
       await new Promise(r => setTimeout(r, 1400));
       setResult(analyzeText(text));
+      _incrementUsage();
+      setUsageCount(_getUsageToday());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Analysis failed. Please try again.');
     } finally {
@@ -588,7 +620,7 @@ function DemoPanel() {
     { label: 'Scam attempt', text: "Congratulations! You've been selected for a $5,000 grant. Send your bank details and $150 processing fee immediately." },
   ];
 
-  const canAnalyze = text.trim().length >= 10 && !loading;
+  const canAnalyze = text.trim().length >= 10 && !loading && !isLimitReached;
 
   return (
     <div id="demo" style={{ marginTop: 80 }}>
@@ -672,6 +704,11 @@ function DemoPanel() {
             </div>
           )}
 
+          {isLimitReached && (
+            <div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', fontSize: 13, color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <span>Daily free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for unlimited access.</span>
+            </div>
+          )}
           <button onClick={analyze} disabled={!canAnalyze}
             style={{ width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500, cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none', background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white', boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)', transition: 'all 0.25s', fontFamily: 'inherit' }}>
             {loading ? '⏳ Analyzing...' : '⚡ Analyze with Sumalyze'}
@@ -1039,9 +1076,9 @@ function TestimonialsSection() {
   return (
     <section style={{ padding: '0 20px 120px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>Testimonials</SectionBadge>
-        <SectionTitle>People love Sumalyze</SectionTitle>
-        <SectionDesc>Don't take our word for it — here's what early users say.</SectionDesc>
+        <SectionBadge>Beta Feedback</SectionBadge>
+        <SectionTitle>What people say</SectionTitle>
+        <SectionDesc>Impressions from early beta users and testers during our closed preview.</SectionDesc>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20, marginTop: 52 }}>
           {TESTIMONIALS.map((t, idx) => (
@@ -1129,7 +1166,7 @@ function Footer({ onNavigate }: { onNavigate: (page: 'privacy' | 'terms') => voi
             <FooterCol label="Mission" links={[
               { l: 'Nonprofit', h: '#mission' },
               { l: 'Support on Ko-fi', h: 'https://ko-fi.com/sumalyze' },
-              { l: 'Contact', h: 'mailto:hello@sumalyze.com' },
+              { l: 'Contact', h: 'mailto:hello@sumalyze.space' },
             ]} />
             <div>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Legal</p>
