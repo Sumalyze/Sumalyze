@@ -54,12 +54,12 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
 
           <Section title="About Sumalyze">
             <p>
-              Sumalyze is a free, nonprofit AI communication intelligence platform. By using Sumalyze, you agree to these terms. If you do not agree, please do not use the service.
+              Sumalyze is an MVP free, nonprofit AI communication intelligence platform. By using Sumalyze, you agree to these terms. If you do not agree, please do not use the service.
             </p>
           </Section>
 
           <Section title="The Service">
-            <p>Sumalyze provides AI-powered text analysis tools including summarization, tone detection, intent analysis, and communication scoring. The service is provided free of charge with no mandatory account required.</p>
+            <p>Sumalyze provides AI-powered text analysis tools including summarization, tone detection, intent analysis, and communication scoring. The service is provided free of charge during the MVP stage with no mandatory account required.</p>
             <p>We reserve the right to modify, suspend, or discontinue the service at any time without notice, though we aim to provide continuity as a nonprofit project.</p>
           </Section>
 

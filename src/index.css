@@ -163,6 +163,64 @@
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(226, 62, 87, 0.08);
 }
 
+/* ─── Bento Grid & Workspace Redesign ─────────────────────── */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.bento-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  padding: 24px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(226, 62, 87, 0.25);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 24px rgba(226, 62, 87, 0.06);
+}
+
+/* Animations for Workspace Preview */
+@keyframes codeLinePulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.95; }
+}
+
+.animate-pulse-line {
+  animation: codeLinePulse 2.5s ease-in-out infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+.cursor-blink::after {
+  content: '|';
+  color: #E23E57;
+  animation: cursorBlink 1s infinite;
+}
+
+/* Glowing dot connection lines */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.animate-dash-line {
+  stroke-dasharray: 5;
+  animation: dash 1.5s linear infinite;
+}
+
+
 /* Prevent unwanted automatic zoom on iPhone in Safari */
 @media (max-width: 768px) {
   input, textarea, select {
@@ -226,6 +284,47 @@
   }
 }
 
+/* ─── Agent Stepper ─────────────────────────────────────────── */
+@keyframes stepperPop {
+  0%   { opacity: 0; transform: scale(0.92) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes resultSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Tool Cards ─────────────────────────────────────────────── */
+.tool-output-enter {
+  animation: fadeUp 0.35s ease both;
+}
+
+/* ─── Dropdown menu ─────────────────────────────────────────── */
+@keyframes dropdownOpen {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.nav-dropdown {
+  animation: dropdownOpen 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Mobile nav panel ──────────────────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mobile-menu-open {
+  animation: slideDown 0.2s ease both;
+}
+
+/* ─── Page transitions ──────────────────────────────────────── */
+.page-enter {
+  animation: fadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ─── Accessibility: Reduced Motion ────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -237,4 +336,51 @@
     transform: none !important;
   }
 }
+
+/* ─── Mobile Responsiveness Utility Overrides ──────────────── */
+
+/* Legal pages card responsiveness */
+@media (max-width: 540px) {
+  .legal-section-card {
+    padding: 20px 16px !important;
+  }
+}
+
+/* Audience section tab panel padding responsive */
+@media (max-width: 540px) {
+  .audience-tab-panel {
+    padding: 20px 16px !important;
+  }
+}
+
+/* Agent Goals Grid responsiveness */
+@media (max-width: 600px) {
+  .agent-goals-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .agent-goals-grid > button {
+    grid-column: span 1 !important;
+  }
+}
+
+/* Agent Results Summary + Score Row responsiveness */
+@media (max-width: 640px) {
+  .summary-score-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Bento grid replies stack */
+@media (max-width: 540px) {
+  .bento-replies-flex {
+    flex-direction: column !important;
+  }
+}
+
+/* Mobile scroll safety for header dropdown */
+.mobile-menu-scrollable {
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+}
+
 

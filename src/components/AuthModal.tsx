@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import sumalyzeLogo from '../assets/sumalyzelogo.png';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -127,17 +128,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 9,
-            background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
-            boxShadow: '0 4px 14px rgba(226,62,87,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
-              <path d="M3 5h12M3 9h8M3 13h10" stroke="white" strokeWidth="1.75" strokeLinecap="round" />
-              <circle cx="14" cy="13" r="2" fill="white" />
-            </svg>
-          </div>
+          <img src={sumalyzeLogo} alt="Sumalyze logo" style={{ width: 32, height: 32, objectFit: 'contain' }} />
           <span style={{ fontSize: 16, fontWeight: 500, color: 'white' }}>Sumalyze</span>
         </div>
 
@@ -150,7 +141,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             ? 'Sign in to your Sumalyze account'
             : mode === 'forgot'
             ? 'Enter your email and we\'ll send a reset link'
-            : 'Free forever — no credit card required'}
+            : 'MVP Free — no credit card required'}
         </p>
 
         {/* Mode tabs — only login/signup */}
@@ -290,7 +281,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </form>
 
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginTop: 20 }}>
-          Free forever · No credit card · Nonprofit
+          MVP Free · No credit card · Nonprofit
         </p>
       </div>
     </>
