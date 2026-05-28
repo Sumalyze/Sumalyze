@@ -1,12 +1,13 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   runAgentWorkflow,
   AGENT_STEPS,
   type AgentGoal,
   type AgentResult,
 } from '../services/ai';
-import { isLimitReached, incrementUsage, getRemainingUses } from '../services/limits';
+import { isLimitReached, incrementUsage, getRemainingUses, incrementServerUsage, fetchAndCacheLimits } from '../services/limits';
 import { useAuth } from '../hooks/useAuth';
+import { saveAgentRun, saveOutput } from '../services/database';
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
@@ -111,10 +112,45 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
+function SaveOutputButton({ title, content, type }: { title: string; content: string; type: string }) {
+  const { user } = useAuth();
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const { error } = await saveOutput(title, content, type);
+      if (error) throw error;
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      alert(`Failed to save: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <button onClick={handleSave} disabled={saved || saving} style={{
+      padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+      border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
+      color: saved ? '#34d399' : 'rgba(255,255,255,0.4)', cursor: saved ? 'default' : 'pointer',
+      transition: 'all 0.2s', fontFamily: 'inherit',
+    }}>
+      {saving ? '⏳ Saving...' : saved ? '✓ Saved' : '💾 Save'}
+    </button>
+  );
+}
+
 /* ─── Result Card ─────────────────────────────────────────────── */
 
-function ResultCard({ label, accent, icon, children, copyText }: {
+function ResultCard({ label, accent, icon, children, copyText, saveData }: {
   label: string; accent: string; icon: string; children: React.ReactNode; copyText?: string;
+  saveData?: { title: string; content: string; type: string };
 }) {
   return (
     <div style={{
@@ -127,7 +163,10 @@ function ResultCard({ label, accent, icon, children, copyText }: {
           <span style={{ fontSize: 11, color: accent }}>{icon}</span>
           <span style={{ fontSize: 10, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</span>
         </div>
-        {copyText && <CopyBtn text={copyText} />}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {saveData && <SaveOutputButton title={saveData.title} content={saveData.content} type={saveData.type} />}
+          {copyText && <CopyBtn text={copyText} />}
+        </div>
       </div>
       {children}
     </div>
@@ -151,7 +190,7 @@ function AgentResultsPanel({ result }: { result: AgentResult }) {
 
       {/* Summary + Score row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'start' }} className="summary-score-row">
-        <ResultCard label="Summary" accent="#E23E57" icon="✦" copyText={result.summary}>
+        <ResultCard label="Summary" accent="#E23E57" icon="✦" copyText={result.summary} saveData={{ title: 'Agent Summary', content: result.summary, type: 'summary' }}>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: '20px', margin: 0 }}>{result.summary}</p>
         </ResultCard>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '16px', minWidth: 90 }}>
@@ -211,7 +250,7 @@ function AgentResultsPanel({ result }: { result: AgentResult }) {
       </div>
 
       {/* Action Steps */}
-      <ResultCard label="Suggested Action Steps" accent="#34d399" icon="◷" copyText={result.actionSteps.join('\n')}>
+      <ResultCard label="Suggested Action Steps" accent="#34d399" icon="◷" copyText={result.actionSteps.join('\n')} saveData={{ title: 'Agent Action Steps', content: result.actionSteps.join('\n'), type: 'action_steps' }}>
         <ol style={{ margin: 0, padding: '0 0 0 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {result.actionSteps.map((step, i) => (
             <li key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: '20px' }}>{step}</li>
@@ -220,7 +259,7 @@ function AgentResultsPanel({ result }: { result: AgentResult }) {
       </ResultCard>
 
       {/* Reply Draft */}
-      <ResultCard label="Reply Draft" accent="#a78bfa" icon="✉" copyText={result.replyDraft}>
+      <ResultCard label="Reply Draft" accent="#a78bfa" icon="✉" copyText={result.replyDraft} saveData={{ title: 'Agent Reply Draft', content: result.replyDraft, type: 'reply_draft' }}>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: '20px', fontStyle: 'italic', margin: 0 }}>
           "{result.replyDraft}"
         </p>
@@ -256,6 +295,12 @@ export default function AgentPage({ onSignIn }: { onSignIn: () => void }) {
   const [result, setResult] = useState<AgentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchAndCacheLimits();
+    }
+  }, [isLoggedIn]);
+
   const abortRef = useRef<AbortController | null>(null);
 
   const SAMPLE_TEXTS = [
@@ -281,7 +326,15 @@ export default function AgentPage({ onSignIn }: { onSignIn: () => void }) {
         abortRef.current.signal,
       );
       setResult(res);
-      incrementUsage('agent');
+
+      if (isLoggedIn) {
+        await incrementServerUsage('increment_agent');
+        // Log workflow steps completed (compliance: no thought process references)
+        const logSteps = AGENT_STEPS.map(s => ({ label: s.label, status: 'done' }));
+        await saveAgentRun(selectedGoal, logSteps, res.summary, 'completed');
+      } else {
+        incrementUsage('agent', false);
+      }
     } catch (e) {
       if (e instanceof Error && e.message !== 'Agent run cancelled') {
         setError(e.message || 'Agent run failed. Please try again.');

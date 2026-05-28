@@ -12,6 +12,16 @@
   to     = "/.netlify/functions/analyze"
   status = 200
 
+[[redirects]]
+  from   = "/api/update-usage"
+  to     = "/.netlify/functions/update-usage"
+  status = 200
+
+[[redirects]]
+  from   = "/api/ai-analyze"
+  to     = "/.netlify/functions/ai-analyze"
+  status = 200
+
 # ── SPA fallback — all routes serve index.html ─────────────────────────────
 [[redirects]]
   from   = "/*"

@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { TOOLS, type ToolDef } from '../data/tools';
 import { runSingleTool, type ToolResult } from '../services/ai';
-import { isLimitReached, incrementUsage, getRemainingUses } from '../services/limits';
+import { isLimitReached, incrementUsage, getRemainingUses, incrementServerUsage, fetchAndCacheLimits } from '../services/limits';
 import { useAuth } from '../hooks/useAuth';
+import { saveAnalysisHistory, saveOutput } from '../services/database';
 
 /* ─── Shared micro-components ──────────────────────────────────── */
 
@@ -40,6 +41,40 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function SaveOutputButton({ title, content, type }: { title: string; content: string; type: string }) {
+  const { user } = useAuth();
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const { error } = await saveOutput(title, content, type);
+      if (error) throw error;
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      alert(`Failed to save: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <button onClick={handleSave} disabled={saved || saving} style={{
+      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 500,
+      border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
+      color: saved ? '#34d399' : 'rgba(255,255,255,0.5)', cursor: saved ? 'default' : 'pointer',
+      transition: 'all 0.2s', fontFamily: 'inherit',
+    }}>
+      {saving ? '⏳ Saving...' : saved ? '✓ Saved' : '💾 Save Output'}
+    </button>
+  );
+}
+
 /* ─── Individual Tool Panel ────────────────────────────────────── */
 
 function ToolPanel({ tool, isLoggedIn }: { tool: ToolDef; isLoggedIn: boolean }) {
@@ -63,7 +98,13 @@ function ToolPanel({ tool, isLoggedIn }: { tool: ToolDef; isLoggedIn: boolean })
     try {
       const res = await runSingleTool(tool.id, text, abortRef.current.signal);
       setResult(res);
-      incrementUsage('tools');
+      
+      if (isLoggedIn) {
+        await incrementServerUsage('increment_tool');
+        await saveAnalysisHistory(text, tool.id, res);
+      } else {
+        incrementUsage('tools', false);
+      }
     } catch (e) {
       if (e instanceof Error && e.message !== 'Tool run cancelled') {
         setError(e.message || 'Analysis failed. Please try again.');
@@ -71,7 +112,7 @@ function ToolPanel({ tool, isLoggedIn }: { tool: ToolDef; isLoggedIn: boolean })
     } finally {
       setLoading(false);
     }
-  }, [canRun, text, tool.id]);
+  }, [canRun, text, tool.id, isLoggedIn]);
 
   const loadPreset = () => {
     setText(tool.exampleText);
@@ -198,7 +239,10 @@ function ToolPanel({ tool, isLoggedIn }: { tool: ToolDef; isLoggedIn: boolean })
               </span>
               {result._mock && <Badge color="#6B7280">Preview</Badge>}
             </div>
-            <CopyButton text={result.output} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <SaveOutputButton title={tool.name} content={result.output} type={tool.id} />
+              <CopyButton text={result.output} />
+            </div>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: '20px', whiteSpace: 'pre-line', margin: 0 }}>
             {result.output}
@@ -233,6 +277,12 @@ export default function ToolsPage({ onSignIn }: { onSignIn: () => void }) {
   const isLoggedIn = !!user;
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchAndCacheLimits();
+    }
+  }, [isLoggedIn]);
 
   const filtered = TOOLS.filter(t => {
     const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase());

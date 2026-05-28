@@ -9,13 +9,14 @@ import ToolsPage from './pages/ToolsPage';
 import AgentPage from './pages/AgentPage';
 import WorkflowsPage from './pages/WorkflowsPage';
 import UseCasesPage from './pages/UseCasesPage';
+import HistoryPage from './pages/HistoryPage';
 import sumalyzeLogo from './assets/sumalyzelogo.png';
 
 /* ============================================================
    Sumalyze — AI Clarity Workspace
    ============================================================ */
 
-type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'agent' | 'workflows' | 'usecases';
+type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'agent' | 'workflows' | 'usecases' | 'history';
 
 export default function App() {
   const [page, setPage] = useState<Page>('home');
@@ -25,7 +26,7 @@ export default function App() {
   useEffect(() => {
     const readHash = () => {
       const h = window.location.hash.replace('#', '');
-      const validPages: Page[] = ['privacy', 'terms', 'tools', 'agent', 'workflows', 'usecases'];
+      const validPages: Page[] = ['privacy', 'terms', 'tools', 'agent', 'workflows', 'usecases', 'history'];
       setPage(validPages.includes(h as Page) ? (h as Page) : 'home');
     };
     readHash();
@@ -63,6 +64,11 @@ export default function App() {
         {page === 'usecases' && (
           <div className="page-enter">
             <UseCasesPage onNavigateTools={() => navigate('tools')} onNavigateAgent={() => navigate('agent')} />
+          </div>
+        )}
+        {page === 'history' && (
+          <div className="page-enter">
+            <HistoryPage />
           </div>
         )}
         {page === 'home' && (
@@ -166,6 +172,9 @@ function Header({ onLoginClick, onNavigate, currentPage }: {
           {mainNavLinks.map(l => (
             <NavPillItem key={l.page} label={l.label} active={currentPage === l.page} onClick={() => onNavigate(l.page)} />
           ))}
+          {user && (
+            <NavPillItem label="History" active={currentPage === 'history'} onClick={() => onNavigate('history')} />
+          )}
           {/* More dropdown */}
           <div style={{ position: 'relative' }} data-more-dropdown>
             <button
@@ -265,7 +274,14 @@ function Header({ onLoginClick, onNavigate, currentPage }: {
           padding: '12px 20px 20px',
           display: 'flex', flexDirection: 'column', gap: 2,
         }}>
-          {[{label:'Home',page:'home'},{label:'Tools',page:'tools'},{label:'Agent',page:'agent'},{label:'Workflows',page:'workflows'},{label:'Use Cases',page:'usecases'}].map((l) => (
+          {[
+            { label: 'Home', page: 'home' },
+            { label: 'Tools', page: 'tools' },
+            { label: 'Agent', page: 'agent' },
+            ...(user ? [{ label: 'History', page: 'history' }] : []),
+            { label: 'Workflows', page: 'workflows' },
+            { label: 'Use Cases', page: 'usecases' },
+          ].map((l) => (
             <button
               key={l.label}
               onClick={() => { onNavigate(l.page as Page); setMobileMenuOpen(false); }}

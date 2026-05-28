@@ -13,6 +13,8 @@
 
 import { analyzeText } from '../utils/mockAnalyzer';
 import type { AnalysisResult } from '../utils/mockAnalyzer';
+import { supabase } from '../lib/supabase';
+
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -164,30 +166,68 @@ export async function runAgentWorkflow(
   onStep: (stepIndex: number) => void,
   signal?: AbortSignal
 ): Promise<AgentResult> {
-  const STEP_DELAY_MS = 900;
+  // Get active session if any to bypass client rate limiting
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
 
+  // Start the serverless API analysis in the background
+  const apiPromise = fetch('/api/ai-analyze', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      mode: 'agent',
+      goal,
+      inputText: text,
+    }),
+    signal,
+  });
+
+  const STEP_DELAY_MS = 700;
+
+  // Run stepper simulation in parallel for the premium visual progression
   for (let i = 0; i < AGENT_STEPS.length; i++) {
     if (signal?.aborted) throw new Error('Agent run cancelled');
     await new Promise(r => setTimeout(r, STEP_DELAY_MS));
     onStep(i);
   }
 
-  // TODO: When real backend is ready, replace mock with:
-  // const res = await fetch('/api/agent', {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({ text, goal }),
-  //   signal,
-  // });
-  // if (!res.ok) throw new Error((await res.json()).error || 'Agent failed');
-  // return res.json() as Promise<AgentResult>;
+  // Await serverless AI completion
+  const res = await apiPromise;
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || 'Agent analysis failed.');
+  }
 
-  return buildMockAgentResult(text, goal);
+  const data = await res.json();
+
+  // Normalize serverless JSON response structure for the UI
+  const emotionsMapped = data.toneAnalysis?.emotions || [
+    { name: 'neutral', value: 100, color: '#6B7280' },
+  ];
+
+  return {
+    summary: data.summary,
+    tone: {
+      overall: data.toneAnalysis?.overall || String(data.toneAnalysis || 'Neutral'),
+      emotions: emotionsMapped,
+    },
+    intent: data.intent,
+    keySignals: data.keySignals || [],
+    riskFlags: data.riskFlags || [],
+    actionSteps: data.suggestedNextActions || [],
+    replyDraft: data.replyDraft,
+    clarityScore: typeof data.clarityScore === 'number' ? data.clarityScore : 75,
+    whatToCheckBeforeReplying: data.whatToCheckBeforeReplying || [],
+    goal: goal,
+    _mock: !!data._mock,
+  };
 }
 
 /**
  * Run a single tool analysis.
- * TODO: Replace with POST /api/tool when backend is ready.
  *
  * @param toolId - The tool identifier (e.g. 'summarizer', 'tone')
  * @param text   - The input text
@@ -198,19 +238,54 @@ export async function runSingleTool(
   text: string,
   signal?: AbortSignal
 ): Promise<ToolResult> {
-  // Simulate network latency
-  await new Promise(r => setTimeout(r, 1400));
-  if (signal?.aborted) throw new Error('Tool run cancelled');
+  // Get active session if any to bypass client rate limiting
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
 
-  // TODO: When real backend is ready, replace mock with:
-  // const res = await fetch('/api/tool', {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({ toolId, text }),
-  //   signal,
-  // });
-  // if (!res.ok) throw new Error((await res.json()).error || 'Tool failed');
-  // return res.json() as Promise<ToolResult>;
+  const res = await fetch('/api/ai-analyze', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      mode: 'tool',
+      toolId,
+      inputText: text,
+    }),
+    signal,
+  });
 
-  return buildMockToolResult(toolId, text);
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || 'Tool analysis failed.');
+  }
+
+  const data = await res.json();
+
+  // Format rich tool JSON response into structured pre-line text output
+  const keyPointsStr = data.keyPoints && data.keyPoints.length > 0
+    ? `\n\n**Key Points:**\n` + data.keyPoints.map((p: string) => `• ${p}`).join('\n')
+    : '';
+
+  const signalsStr = data.signals && data.signals.length > 0
+    ? `\n\n**Signals:** ${data.signals.join(', ')}`
+    : '';
+
+  const risksStr = data.risks && data.risks.length > 0
+    ? `\n\n**Risks:** ${data.risks.join(', ')}`
+    : '';
+
+  const replyStr = data.suggestedReply 
+    ? `\n\n**Suggested Reply:**\n${data.suggestedReply}`
+    : '';
+
+  const outputString = `### ${data.title || 'Analysis Result'}\n\n**Summary:** ${data.summary}${keyPointsStr}\n\n**Tone:** ${data.tone}\n\n**Intent:** ${data.intent}${signalsStr}${risksStr}${replyStr}`;
+
+  return {
+    output: outputString,
+    confidence: data._mock ? 78 : 95,
+    tags: data.signals || ['analysis'],
+    _mock: !!data._mock,
+  };
 }
