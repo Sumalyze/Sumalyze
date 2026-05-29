@@ -3,6 +3,7 @@ import { analyzeText } from './utils/mockAnalyzer';
 import type { AnalysisResult } from './utils/mockAnalyzer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthModal from './components/AuthModal';
+import FeedbackModal from './components/FeedbackModal';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import ToolsPage from './pages/ToolsPage';
@@ -10,95 +11,159 @@ import AgentPage from './pages/AgentPage';
 import WorkflowsPage from './pages/WorkflowsPage';
 import UseCasesPage from './pages/UseCasesPage';
 import HistoryPage from './pages/HistoryPage';
+import PricingPage from './pages/PricingPage';
 import sumalyzeLogo from './assets/sumalyzelogo.png';
+import { ToastProvider } from './components/Toast';
+import { parseFile } from './utils/fileParser';
+
+
 
 /* ============================================================
    Sumalyze — AI Clarity Workspace
    ============================================================ */
 
-type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'agent' | 'workflows' | 'usecases' | 'history';
+type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing';
+
+const hashToPathMap: Record<string, string> = {
+  tools: '/tools',
+  agent: '/agent',
+  workflows: '/workflows',
+  usecases: '/use-cases',
+  history: '/history',
+  privacy: '/privacy',
+  terms: '/terms',
+  pricing: '/pricing'
+};
 
 export default function App() {
   const [page, setPage] = useState<Page>('home');
   const [authOpen, setAuthOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
-  // Hash-based routing — supports #privacy, #terms, #tools, #agent, #workflows, #usecases
+  // Pathname-based routing with backward compatibility for hash routes
   useEffect(() => {
-    const readHash = () => {
-      const h = window.location.hash.replace('#', '');
-      const validPages: Page[] = ['privacy', 'terms', 'tools', 'agent', 'workflows', 'usecases', 'history'];
-      setPage(validPages.includes(h as Page) ? (h as Page) : 'home');
+    const handleLocationChange = () => {
+      // 1. Backward compatibility check
+      const hash = window.location.hash.replace('#', '');
+      if (hash && hashToPathMap[hash]) {
+        const targetPath = hashToPathMap[hash];
+        window.history.replaceState(null, '', targetPath);
+        window.location.hash = ''; // clear hash
+      }
+
+      // 2. Parse current pathname
+      const path = window.location.pathname;
+      if (path === '/' || path === '/index.html') {
+        setPage('home');
+      } else if (path === '/tools') {
+        setPage('tools');
+      } else if (path === '/agent') {
+        setPage('agent');
+      } else if (path === '/workflows') {
+        setPage('workflows');
+      } else if (path === '/use-cases') {
+        setPage('usecases');
+      } else if (path === '/history') {
+        setPage('history');
+      } else if (path === '/pricing') {
+        setPage('pricing');
+      } else if (path === '/privacy') {
+        setPage('privacy');
+      } else if (path === '/terms') {
+        setPage('terms');
+      } else {
+        setPage('home');
+      }
     };
-    readHash();
-    window.addEventListener('hashchange', readHash);
-    return () => window.removeEventListener('hashchange', readHash);
+
+    handleLocationChange();
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
 
-  const navigate = (p: Page) => { window.location.hash = p === 'home' ? '' : p; };
+  const navigate = (p: Page) => {
+    let path = '/';
+    if (p === 'usecases') path = '/use-cases';
+    else if (p !== 'home') path = `/${p}`;
+    
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+      setPage(p);
+    }
+  };
 
-  if (page === 'privacy') return <AuthProvider><PrivacyPolicy onClose={() => navigate('home')} /></AuthProvider>;
-  if (page === 'terms')   return <AuthProvider><TermsOfService onClose={() => navigate('home')} /></AuthProvider>;
+  if (page === 'privacy') return <ToastProvider><AuthProvider><PrivacyPolicy onClose={() => navigate('home')} /></AuthProvider></ToastProvider>;
+  if (page === 'terms')   return <ToastProvider><AuthProvider><TermsOfService onClose={() => navigate('home')} /></AuthProvider></ToastProvider>;
 
   return (
-    <AuthProvider>
-      <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', overflowX: 'hidden', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-        <Header onLoginClick={() => setAuthOpen(true)} onNavigate={navigate} currentPage={page} />
+    <ToastProvider>
+      <AuthProvider>
+        <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', overflowX: 'hidden', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
+          <Header onLoginClick={() => setAuthOpen(true)} onNavigate={navigate} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
 
-        {page === 'tools' && (
-          <div className="page-enter">
-            <ToolsPage onSignIn={() => setAuthOpen(true)} />
-          </div>
-        )}
-        {page === 'agent' && (
-          <div className="page-enter">
-            <AgentPage onSignIn={() => setAuthOpen(true)} />
-          </div>
-        )}
-        {page === 'workflows' && (
-          <div className="page-enter">
-            <WorkflowsPage onNavigateAgent={() => navigate('agent')} />
-          </div>
-        )}
-        {page === 'usecases' && (
-          <div className="page-enter">
-            <UseCasesPage onNavigateTools={() => navigate('tools')} onNavigateAgent={() => navigate('agent')} />
-          </div>
-        )}
-        {page === 'history' && (
-          <div className="page-enter">
-            <HistoryPage />
-          </div>
-        )}
-        {page === 'home' && (
-          <>
-            <Hero onNavigate={navigate} />
-            <FromToolToAgentSection onNavigate={navigate} />
-            <AudienceSection />
-            <DemoSection />
-            <InteractiveToneSection />
-            <BentoModulesSection />
-            <BuiltForSection onNavigate={navigate} />
-            <MissionSection />
-            <TestimonialsSection />
-            <FinalCTA onNavigate={navigate} />
-          </>
-        )}
+          {page === 'tools' && (
+            <div className="page-enter">
+              <ToolsPage onSignIn={() => setAuthOpen(true)} />
+            </div>
+          )}
+          {page === 'agent' && (
+            <div className="page-enter">
+              <AgentPage onSignIn={() => setAuthOpen(true)} />
+            </div>
+          )}
+          {page === 'workflows' && (
+            <div className="page-enter">
+              <WorkflowsPage onNavigateAgent={() => navigate('agent')} />
+            </div>
+          )}
+          {page === 'usecases' && (
+            <div className="page-enter">
+              <UseCasesPage onNavigateTools={() => navigate('tools')} onNavigateAgent={() => navigate('agent')} />
+            </div>
+          )}
+          {page === 'pricing' && (
+            <div className="page-enter">
+              <PricingPage />
+            </div>
+          )}
+          {page === 'history' && (
+            <div className="page-enter">
+              <HistoryPage />
+            </div>
+          )}
+          {page === 'home' && (
+            <>
+              <Hero onNavigate={navigate} />
+              <FromToolToAgentSection onNavigate={navigate} />
+              <AudienceSection />
+              <DemoSection />
+              <InteractiveToneSection />
+              <BentoModulesSection />
+              <BuiltForSection onNavigate={navigate} />
+              <MissionSection />
+              <TestimonialsSection />
+              <FinalCTA onNavigate={navigate} />
+            </>
+          )}
 
-        <Footer onNavigate={navigate} />
-        <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-      </div>
-    </AuthProvider>
+          <Footer onNavigate={navigate} onFeedbackClick={() => setFeedbackOpen(true)} />
+          <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+          <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+        </div>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
 /* ============================================================
    HEADER — Clean nav: Home, Tools, Agent, More dropdown
    ============================================================ */
-function Header({ onLoginClick, onNavigate, currentPage }: {
+function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
   onLoginClick: () => void;
   onNavigate: (p: Page) => void;
+  onFeedbackClick: () => void;
   currentPage: Page;
 }) {
   const { user, signOut } = useAuth();
@@ -132,11 +197,13 @@ function Header({ onLoginClick, onNavigate, currentPage }: {
   const mainNavLinks: { label: string; page: Page }[] = [
     { label: 'Tools',  page: 'tools' },
     { label: 'Agent',  page: 'agent' },
+    { label: 'Pricing', page: 'pricing' },
   ];
 
-  const moreLinks: { label: string; page?: Page; href?: string }[] = [
+  const moreLinks: { label: string; page?: Page; href?: string; onClick?: () => void }[] = [
     { label: 'Workflows',  page: 'workflows' },
     { label: 'Use Cases',  page: 'usecases' },
+    { label: 'Feedback',   onClick: onFeedbackClick },
     { label: 'Support',    href: 'https://ko-fi.com/sumalyze' },
     { label: 'Privacy',    page: 'privacy' },
     { label: 'Terms',      page: 'terms' },
@@ -205,6 +272,7 @@ function Header({ onLoginClick, onNavigate, currentPage }: {
                       setMoreOpen(false);
                       if (link.page) onNavigate(link.page);
                       else if (link.href) window.open(link.href, '_blank', 'noopener,noreferrer');
+                      else if (link.onClick) link.onClick();
                     }}
                     style={{
                       display: 'block', width: '100%', textAlign: 'left',
@@ -278,6 +346,7 @@ function Header({ onLoginClick, onNavigate, currentPage }: {
             { label: 'Home', page: 'home' },
             { label: 'Tools', page: 'tools' },
             { label: 'Agent', page: 'agent' },
+            { label: 'Pricing', page: 'pricing' },
             ...(user ? [{ label: 'History', page: 'history' }] : []),
             { label: 'Workflows', page: 'workflows' },
             { label: 'Use Cases', page: 'usecases' },
@@ -295,6 +364,17 @@ function Header({ onLoginClick, onNavigate, currentPage }: {
               {l.label}
             </button>
           ))}
+          <button
+            onClick={() => { onFeedbackClick(); setMobileMenuOpen(false); }}
+            style={{
+              padding: '11px 12px', borderRadius: 10, fontSize: 15, fontWeight: 500,
+              display: 'block', textAlign: 'left', background: 'none',
+              border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.75)',
+              fontFamily: 'inherit',
+            }}
+          >
+            Feedback
+          </button>
           <a
             href="https://ko-fi.com/sumalyze"
             target="_blank"
@@ -822,6 +902,7 @@ function DemoPanel() {
   const { user } = useAuth();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [tab, setTab] = useState<'paste' | 'upload'>('paste');
   const [error, setError] = useState<string | null>(null);
@@ -889,30 +970,27 @@ function DemoPanel() {
   };
 
 
-  const handleFileUpload = (file: File) => {
-    const supportedTypes = ['text/plain'];
-    const ext = file.name.split('.').pop()?.toLowerCase();
+  const handleFileUpload = async (file: File) => {
+    setParsing(true);
+    setError(null);
+    setUploadedFileName(null);
 
-    if (!supportedTypes.includes(file.type) && ext !== 'txt') {
-      setError(`Unsupported file type: .${ext}. Please upload a .txt file. PDF and DOCX support coming soon.`);
-      return;
-    }
-    if (file.size > 500_000) {
-      setError('File too large. Maximum size is 500KB.');
-      return;
-    }
+    try {
+      const res = await parseFile(file);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setText(content);
+      setText(res.text);
       setUploadedFileName(file.name);
       setTab('paste'); // switch to paste view to show the text
       setResult(null);
-      setError(null);
-    };
-    reader.onerror = () => setError('Could not read file. Please try again.');
-    reader.readAsText(file);
+    } catch (err: any) {
+      setError(err.message || 'Could not read file. Please try again.');
+    } finally {
+      setParsing(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -1008,18 +1086,28 @@ function DemoPanel() {
               <div
                 onDrop={handleDrop}
                 onDragOver={e => e.preventDefault()}
-                onClick={() => fileInputRef.current?.click()}
-                style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'}
+                onClick={() => { if (!parsing) fileInputRef.current?.click(); }}
+                style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: parsing ? 'not-allowed' : 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
+                onMouseEnter={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'; }}
+                onMouseLeave={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}
               >
-                <span style={{ fontSize: 32 }}>📄</span>
-                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop .txt file here or click to browse</p>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>TXT supported · PDF & DOCX coming soon</p>
+                {parsing ? (
+                  <>
+                    <span style={{ fontSize: 24, animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⏳</span>
+                    <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Parsing document...</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Extracting text content locally...</p>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 32 }}>📄</span>
+                    <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop document here or click to browse</p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>PDF, DOCX, TXT supported · Max 5MB</p>
+                  </>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,text/plain"
+                  accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   style={{ display: 'none' }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
                 />
@@ -1812,7 +1900,7 @@ function FinalCTA({ onNavigate }: { onNavigate: (p: Page) => void }) {
 /* ============================================================
    FOOTER
    ============================================================ */
-function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
+function Footer({ onNavigate, onFeedbackClick }: { onNavigate: (page: Page) => void; onFeedbackClick: () => void }) {
   return (
     <footer style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '48px 20px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -1824,7 +1912,7 @@ function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
               <span style={{ fontSize: 16, fontWeight: 500, color: 'white' }}>Sumalyze</span>
             </div>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', maxWidth: 220, lineHeight: '20px' }}>
-              MVP Free nonprofit AI communication intelligence platform.
+              SaaS clarity workspace & agent platform.
             </p>
           </div>
 
@@ -1832,19 +1920,34 @@ function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
           <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
             <div>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Product</p>
-              {(['tools','agent','workflows','usecases'] as const).map(p => (
-                <button key={p} onClick={() => onNavigate(p)} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s', textTransform: 'capitalize' }}
+              {(['tools','agent','workflows','usecases','pricing'] as const).map(p => (
+                <button key={p} onClick={() => onNavigate(p)} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
                   onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
                   onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
-                  {p === 'usecases' ? 'Use Cases' : p.charAt(0).toUpperCase() + p.slice(1)}
+                  {p === 'usecases' ? 'Use Cases' : p === 'workflows' ? 'Workflows' : p.charAt(0).toUpperCase() + p.slice(1)}
                 </button>
               ))}
             </div>
-            <FooterCol label="Mission" links={[
-              { l: 'Our Philosophy', h: '#mission' },
-              { l: 'Support on Ko-fi', h: 'https://ko-fi.com/sumalyze' },
-              { l: 'Contact', h: 'mailto:hello@sumalyze.space' },
-            ]} />
+
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Workspace</p>
+              <button onClick={() => onNavigate('history')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                History
+              </button>
+              <button onClick={onFeedbackClick} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Submit Feedback
+              </button>
+              <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 14, color: '#ff8fa3', textDecoration: 'none', transition: 'color 0.2s', fontWeight: 500, marginBottom: 10 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#ffb3c1'}
+                onMouseLeave={e => e.currentTarget.style.color = '#ff8fa3'}>
+                ♥ Support on Ko-fi
+              </a>
+            </div>
+
             <div>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Legal</p>
               <button onClick={() => onNavigate('privacy')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
@@ -1867,24 +1970,6 @@ function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterCol({ label, links }: { label: string; links: { l: string; h: string }[] }) {
-  return (
-    <div>
-      <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>{label}</p>
-      {links.map(link => (
-        <a key={link.l} href={link.h}
-          target={link.h.startsWith('http') ? '_blank' : undefined}
-          rel={link.h.startsWith('http') ? 'noopener noreferrer' : undefined}
-          style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', marginBottom: 10, transition: 'color 0.2s' }}
-          onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
-          {link.l}
-        </a>
-      ))}
-    </div>
   );
 }
 

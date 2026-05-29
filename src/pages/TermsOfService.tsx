@@ -46,7 +46,7 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
             Terms of Service
           </h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.4)' }}>
-            Last updated: May 27, 2026
+            Last updated: May 29, 2026
           </p>
         </div>
 
@@ -54,24 +54,23 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
 
           <Section title="About Sumalyze">
             <p>
-              Sumalyze is an MVP free, nonprofit AI communication intelligence platform. By using Sumalyze, you agree to these terms. If you do not agree, please do not use the service.
+              Sumalyze is a nonprofit AI communication intelligence platform. By using Sumalyze (either as a guest or as a registered account holder), you agree to these terms. If you do not agree, please do not use the workspace.
             </p>
           </Section>
 
-          <Section title="The Service">
-            <p>Sumalyze provides AI-powered text analysis tools including summarization, tone detection, intent analysis, and communication scoring. The service is provided free of charge during the MVP stage with no mandatory account required.</p>
-            <p>We reserve the right to modify, suspend, or discontinue the service at any time without notice, though we aim to provide continuity as a nonprofit project.</p>
+          <Section title="The Service & Usage Limits">
+            <p>Sumalyze provides AI-powered text analysis tools including summarization, tone detection, intent analysis, risk spotting, and agent-driven clarity workflows. The service is provided free of charge during our MVP stage.</p>
+            <p>To ensure fair access and prevent abuse, we enforce usage limit tiers (such as 50 daily single tool runs and 10 agent mode runs for registered accounts). Guest interactions are subject to an in-memory IP rate limiter (5 requests per 60 seconds). Bypassing, scraping, or programmatic loading of these endpoints is strictly prohibited.</p>
           </Section>
 
           <Section title="Acceptable Use">
             <p>You agree not to use Sumalyze to:</p>
             <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               {[
-                'Analyze or generate content that is illegal, harmful, or abusive',
-                'Attempt to reverse-engineer, scrape, or overload our systems',
-                'Use the service for spam or bulk automated analysis',
-                'Impersonate others or submit their private communications without consent',
-                'Violate any applicable laws or regulations',
+                'Analyze or process text that contains illegal, harmful, or abusive materials',
+                'Attempt to reverse-engineer, scan, scrape, or flood our serverless API routes',
+                'Submit private personal communications of others without their explicit consent',
+                'Violate any local, national, or international laws or regulations',
               ].map(item => (
                 <li key={item} style={{ display: 'flex', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
                   <span style={{ color: '#E23E57', flexShrink: 0 }}>✕</span>
@@ -81,61 +80,42 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
             </ul>
           </Section>
 
-          <Section title="Your Content">
+          <Section title="Your Content & Data Ownership">
             <p>
-              Text you submit for analysis is yours. We do not claim ownership of your content. We do not store your submitted text on our servers (see our{' '}
-              <a
-                href="#privacy"
-                onClick={() => { window.location.hash = 'privacy'; }}
-                style={{ color: '#ff8fa3', cursor: 'pointer' }}
-              >
-                Privacy Policy
-              </a>
-              ).
+              Text you submit for analysis is yours. We do not claim ownership of your inputs. Submitted text is processed by our backend Netlify functions and sent to third-party AI APIs (Google Gemini or OpenRouter fallback) in-flight.
             </p>
             <p>
-              By submitting text for analysis, you confirm you have the right to do so and that it does not violate any third party's rights.
+              Signed-in users may save their text and analysis outcomes to their account history tables. Feedback submissions (bug reports, suggestion texts, ratings) are saved in our database. Guest users' text is processed transiently and is never stored.
             </p>
           </Section>
 
-          <Section title="No Warranty">
+          <Section title="No Warranty / Professional Disclaimer">
             <p>
-              Sumalyze is provided <strong style={{ color: 'white' }}>"as is"</strong> without warranty of any kind. AI analysis results are for informational purposes only and should not be relied upon for legal, medical, financial, or other critical decisions.
-            </p>
-            <p>
-              We do not guarantee the accuracy, completeness, or reliability of any analysis output.
+              Sumalyze is provided <strong style={{ color: 'white' }}>"as is"</strong> without warranties of any kind. AI outputs can be inaccurate, incomplete, or wrong. Sumalyze does NOT provide professional, legal, medical, or financial advice. You are solely responsible for how you interpret and use the AI analysis and reply recommendations.
             </p>
           </Section>
 
           <Section title="Limitation of Liability">
             <p>
-              To the fullest extent permitted by law, Sumalyze and its operators shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.
-            </p>
-            <p>
-              Our total liability to you shall not exceed the amount you paid us in the past 12 months (which, for most users, is $0).
+              To the fullest extent permitted by law, Sumalyze and its operators shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service. Our total liability to you shall not exceed the amount you paid us (which is $0 for all free tiers).
             </p>
           </Section>
 
           <Section title="Accounts">
             <p>
-              If you create an account, you are responsible for keeping your credentials secure. You agree to notify us immediately at{' '}
-              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>{' '}
-              of any unauthorized access.
-            </p>
-            <p>
-              We reserve the right to suspend accounts that violate these terms.
+              If you create an account, you are responsible for maintaining the confidentiality of your credentials. We reserve the right to suspend or terminate accounts that violate these terms or trigger excessive system load.
             </p>
           </Section>
 
-          <Section title="Donations">
+          <Section title="Donations via Ko-fi">
             <p>
-              Donations via Ko-fi are voluntary and do not entitle you to any specific features, levels of service, or refunds. All donations support the continued operation of Sumalyze as a nonprofit project.
+              Support contributions via Ko-fi are completely voluntary and nonprofit donations. Donations do not entitle you to any specific Service Level Agreements, features, or refunds.
             </p>
           </Section>
 
           <Section title="Changes to Terms">
             <p>
-              We may update these terms from time to time. Continued use of the service after changes are posted constitutes acceptance of the new terms. The date at the top reflects the most recent update.
+              We may update these terms from time to time. Continued use of the workspace after changes are posted constitutes acceptance of the new terms.
             </p>
           </Section>
 
@@ -180,3 +160,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+

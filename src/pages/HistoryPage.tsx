@@ -8,23 +8,31 @@ import {
   getSavedOutputs,
   deleteSavedOutput,
 } from '../services/database';
+import type { AnalysisHistoryRow, AgentRunRow, SavedOutputRow } from '../types';
+import { useToast } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 type HistoryTab = 'tools' | 'agents' | 'saved';
 
 export default function HistoryPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<HistoryTab>('tools');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Data lists
-  const [toolsHistory, setToolsHistory] = useState<any[]>([]);
-  const [agentRuns, setAgentRuns] = useState<any[]>([]);
-  const [savedOutputs, setSavedOutputs] = useState<any[]>([]);
+  const [toolsHistory, setToolsHistory] = useState<AnalysisHistoryRow[]>([]);
+  const [agentRuns, setAgentRuns] = useState<AgentRunRow[]>([]);
+  const [savedOutputs, setSavedOutputs] = useState<SavedOutputRow[]>([]);
 
   // Selected item modal state
-  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [selectedItem, setSelectedItem] = useState<AnalysisHistoryRow | AgentRunRow | SavedOutputRow | null>(null);
   const [modalType, setModalType] = useState<HistoryTab | null>(null);
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; tab: HistoryTab } | null>(null);
 
   const loadData = async () => {
     if (!user) return;
@@ -56,8 +64,12 @@ export default function HistoryPage() {
     loadData();
   }, [user]);
 
-  const handleDelete = async (id: string, tab: HistoryTab) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
+  const handleDelete = (id: string, tab: HistoryTab) => {
+    setItemToDelete({ id, tab });
+    setDeleteConfirmOpen(true);
+  };
+
+  const executeDelete = async (id: string, tab: HistoryTab) => {
     try {
       let err = null;
       if (tab === 'tools') {
@@ -75,18 +87,19 @@ export default function HistoryPage() {
       }
 
       if (err) throw err;
+      toast.success('Record deleted successfully.');
       if (selectedItem?.id === id) setSelectedItem(null);
     } catch (err: any) {
-      alert(`Delete failed: ${err.message}`);
+      toast.error(`Delete failed: ${err.message}`);
     }
   };
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      alert('Content copied to clipboard!');
+      toast.success('Content copied to clipboard!');
     } catch {
-      alert('Failed to copy to clipboard.');
+      toast.error('Failed to copy to clipboard.');
     }
   };
 
@@ -100,6 +113,10 @@ export default function HistoryPage() {
       </div>
     );
   }
+
+  const toolsItem = modalType === 'tools' && selectedItem ? selectedItem as AnalysisHistoryRow : null;
+  const agentsItem = modalType === 'agents' && selectedItem ? selectedItem as AgentRunRow : null;
+  const savedItem = modalType === 'saved' && selectedItem ? selectedItem as SavedOutputRow : null;
 
   return (
     <div style={{ padding: '120px 20px 80px', maxWidth: 1000, margin: '0 auto' }}>
@@ -256,11 +273,13 @@ export default function HistoryPage() {
                 {modalType === 'tools' ? 'Tools Analysis' : modalType === 'agents' ? 'Agent Mode Run' : 'Saved Bookmark'}
               </span>
               <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: 0 }}>
-                {modalType === 'tools'
-                  ? selectedItem.analysis_type.charAt(0).toUpperCase() + selectedItem.analysis_type.slice(1).replace('_', ' ')
-                  : modalType === 'agents'
-                  ? `Agent: ${selectedItem.goal.charAt(0).toUpperCase() + selectedItem.goal.slice(1).replace('_', ' ')}`
-                  : selectedItem.title}
+                {modalType === 'tools' && toolsItem
+                  ? toolsItem.analysis_type.charAt(0).toUpperCase() + toolsItem.analysis_type.slice(1).replace('_', ' ')
+                  : modalType === 'agents' && agentsItem
+                  ? `Agent: ${agentsItem.goal.charAt(0).toUpperCase() + agentsItem.goal.slice(1).replace('_', ' ')}`
+                  : savedItem
+                  ? savedItem.title
+                  : ''}
               </h3>
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>{new Date(selectedItem.created_at).toLocaleString()}</p>
             </div>
@@ -268,7 +287,7 @@ export default function HistoryPage() {
             {/* Modal content body */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* Input section */}
-              {selectedItem.input_text && (
+              {toolsItem && toolsItem.input_text && (
                 <div>
                   <h4 style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Input text</h4>
                   <div style={{
@@ -276,13 +295,13 @@ export default function HistoryPage() {
                     border: '1px solid rgba(255,255,255,0.05)', fontSize: 14, color: 'rgba(255,255,255,0.85)',
                     lineHeight: '22px', whiteSpace: 'pre-wrap', maxHeight: 150, overflowY: 'auto',
                   }}>
-                    {selectedItem.input_text}
+                    {toolsItem.input_text}
                   </div>
                 </div>
               )}
 
               {/* Output result */}
-              {modalType === 'tools' && selectedItem.results && (
+              {modalType === 'tools' && toolsItem && toolsItem.results && (
                 <div>
                   <h4 style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Output results</h4>
                   <div style={{
@@ -290,14 +309,14 @@ export default function HistoryPage() {
                     border: '1px solid rgba(226,62,87,0.1)', fontSize: 14, color: 'rgba(255,255,255,0.9)',
                     lineHeight: '22px', whiteSpace: 'pre-wrap',
                   }}>
-                    {selectedItem.results.output || JSON.stringify(selectedItem.results)}
+                    {toolsItem.results.output || JSON.stringify(toolsItem.results)}
                   </div>
                 </div>
               )}
 
-              {modalType === 'agents' && (
+              {modalType === 'agents' && agentsItem && (
                 <div>
-                  {selectedItem.final_summary && (
+                  {agentsItem.final_summary && (
                     <div style={{ marginBottom: 16 }}>
                       <h4 style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Final summary</h4>
                       <div style={{
@@ -305,17 +324,17 @@ export default function HistoryPage() {
                         border: '1px solid rgba(226,62,87,0.1)', fontSize: 14, color: 'rgba(255,255,255,0.9)',
                         lineHeight: '22px', whiteSpace: 'pre-wrap',
                       }}>
-                        {selectedItem.final_summary}
+                        {agentsItem.final_summary}
                       </div>
                     </div>
                   )}
 
                   {/* Execution logs */}
-                  {selectedItem.execution_log && Array.isArray(selectedItem.execution_log) && (
+                  {agentsItem.execution_log && Array.isArray(agentsItem.execution_log) && (
                     <div>
                       <h4 style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Execution Log</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {selectedItem.execution_log.map((step: any, idx: number) => (
+                        {agentsItem.execution_log.map((step: any, idx: number) => (
                           <div key={idx} style={{
                             display: 'flex', alignItems: 'center', gap: 10,
                             padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)',
@@ -331,7 +350,7 @@ export default function HistoryPage() {
                 </div>
               )}
 
-              {modalType === 'saved' && (
+              {modalType === 'saved' && savedItem && (
                 <div>
                   <h4 style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Saved content</h4>
                   <div style={{
@@ -339,17 +358,17 @@ export default function HistoryPage() {
                     border: '1px solid rgba(226,62,87,0.1)', fontSize: 14, color: 'rgba(255,255,255,0.9)',
                     lineHeight: '22px', whiteSpace: 'pre-wrap',
                   }}>
-                    {selectedItem.content}
+                    {savedItem.content}
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                    <button onClick={() => copyToClipboard(selectedItem.content)} style={{
+                    <button onClick={() => copyToClipboard(savedItem.content)} style={{
                       flex: 1, padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
                       border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
                       color: 'white', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s',
                     }}>
                       Copy Content
                     </button>
-                    <button onClick={() => handleDelete(selectedItem.id, 'saved')} style={{
+                    <button onClick={() => handleDelete(savedItem.id, 'saved')} style={{
                       padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
                       border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)',
                       color: '#f87171', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s',
@@ -362,6 +381,21 @@ export default function HistoryPage() {
             </div>
           </div>
         </div>
+      )}
+      {deleteConfirmOpen && (
+        <ConfirmModal
+          isOpen={deleteConfirmOpen}
+          onClose={() => { setDeleteConfirmOpen(false); setItemToDelete(null); }}
+          onConfirm={() => {
+            if (itemToDelete) {
+              executeDelete(itemToDelete.id, itemToDelete.tab);
+            }
+          }}
+          title="Delete Record"
+          message="Are you sure you want to delete this record? This action cannot be undone."
+          confirmText="Delete"
+          isDestructive={true}
+        />
       )}
     </div>
   );
@@ -407,7 +441,7 @@ function HistoryCard({ title, text, date, status, badge, onView, onDelete, onCop
       onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.2)'}
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: 'white', margin: 0 }}>{title}</h3>

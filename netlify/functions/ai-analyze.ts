@@ -69,45 +69,117 @@ const json = (statusCode: number, data: unknown): NLResponse => ({
   body: JSON.stringify(data),
 });
 
-// ─── Prompts and Instruction Builders ─────────────────────────────────────
+// ─── Prompts, Normalization & Cleaning Helpers ─────────────────────────────
+
+function cleanJSONText(text: string): string {
+  let clean = text.trim();
+  if (clean.startsWith('```')) {
+    clean = clean.replace(/^```[a-zA-Z]*\s*/, '');
+    clean = clean.replace(/\s*```$/, '');
+  }
+  return clean.trim();
+}
+
+function normalizeAIResult(mode: 'tool' | 'agent', data: any): any {
+  if (!data || typeof data !== 'object') {
+    data = {};
+  }
+  if (mode === 'tool') {
+    return {
+      title: String(data.title || 'Analysis Result'),
+      summary: String(data.summary || 'No summary available.'),
+      keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints.slice(0, 4).map(String) : [],
+      tone: String(data.tone || 'Neutral'),
+      intent: String(data.intent || 'Unknown'),
+      signals: Array.isArray(data.signals) ? data.signals.map(String) : [],
+      risks: Array.isArray(data.risks) ? data.risks.map(String) : [],
+      suggestedReply: String(data.suggestedReply || '')
+    };
+  } else {
+    const toneAnalysis = data.toneAnalysis || {};
+    const emotions = Array.isArray(toneAnalysis.emotions) 
+      ? toneAnalysis.emotions.slice(0, 4).map((e: any) => ({
+          name: String(e.name || 'neutral'),
+          value: typeof e.value === 'number' ? e.value : 100,
+          color: String(e.color || '#6B7280')
+        }))
+      : [{ name: 'neutral', value: 100, color: '#6B7280' }];
+
+    return {
+      summary: String(data.summary || 'No summary available.'),
+      toneAnalysis: {
+        overall: String(toneAnalysis.overall || 'Neutral'),
+        emotions: emotions
+      },
+      intent: String(data.intent || 'Unknown'),
+      keySignals: Array.isArray(data.keySignals) ? data.keySignals.slice(0, 6).map(String) : [],
+      riskFlags: Array.isArray(data.riskFlags) ? data.riskFlags.map(String) : [],
+      importantDetails: Array.isArray(data.importantDetails) ? data.importantDetails.map(String) : [],
+      suggestedNextActions: Array.isArray(data.suggestedNextActions) ? data.suggestedNextActions.map(String) : [],
+      replyDraft: String(data.replyDraft || ''),
+      clarityScore: typeof data.clarityScore === 'number' ? data.clarityScore : 75,
+      whatToCheckBeforeReplying: Array.isArray(data.whatToCheckBeforeReplying) ? data.whatToCheckBeforeReplying.map(String) : []
+    };
+  }
+}
 
 const getToolSystemPrompt = (toolId: string) => `You are a text analysis engine for Sumalyze. Analyze the given text specifically for the tool category "${toolId}".
-Return ONLY a JSON object matching this exact structure (no explanation, no markdown wrappers):
+
+Style Guidelines:
+- Tone: Calm, direct, smart, and slightly human. Avoid robotic, generic, or corporate phrases (do NOT say "As an AI language model..." or use filler fluff).
+- Length: Keep all text short, concise, and scannable.
+- Language: Respond in the language of the input text (e.g., if the text is in English, respond in English; if it is in Serbian, respond in Serbian; if mixed, use the dominant language).
+
+Return ONLY a JSON object matching this exact structure (no explanation, no markdown wrappers, no text before or after the JSON):
 {
-  "title": "A short, relevant title for the analysis",
-  "summary": "One-sentence summary of the text",
-  "keyPoints": ["Key point 1", "Key point 2"],
-  "tone": "The dominant tone or emotion detected",
-  "intent": "The primary intent of the sender",
-  "signals": ["Key signal 1", "Key signal 2"],
-  "risks": ["Risk flag 1", "Risk flag 2"],
-  "suggestedReply": "A recommended, contextual draft response (optional)"
+  "title": "A short, relevant, custom title of the analysis (max 5 words)",
+  "summary": "One direct, high-value sentence capturing the core message",
+  "keyPoints": ["Key point 1 (max 10 words)", "Key point 2 (max 10 words)", "Key point 3 (max 10 words) - max 4 points total"],
+  "tone": "Dominant tone/emotion (e.g., 'Assertive', 'Anxious', 'Warm')",
+  "intent": "The primary objective of the text in one short phrase",
+  "signals": ["Specific signal 1", "Specific signal 2"],
+  "risks": ["Real, practical risk/red flag 1 (no fake alarmism)", "Real, practical risk/red flag 2"],
+  "suggestedReply": "A highly practical, polished, short draft response aligned with the tool category (leave empty if not applicable)"
 }
 Return ONLY valid JSON.`;
 
 const getAgentSystemPrompt = (goal: string) => `You are an advanced AI agent for Sumalyze. Perform a multi-step clarity analysis on the text with the target goal "${goal}".
-Return ONLY a JSON object matching this exact structure (no explanation, no markdown wrappers):
+
+Style Guidelines:
+- Tone: Calm, objective, insightful, and slightly human. Do not overexplain, do not use corporate fluff, and avoid fake certainty.
+- Length: Keep summaries concise and action points highly concrete.
+- Language: Respond in the language of the input text (e.g., if the text is in English, respond in English; if it is in Serbian, respond in Serbian; if mixed, use the dominant language).
+
+Return ONLY a JSON object matching this exact structure (no explanation, no markdown wrappers, no text before or after the JSON):
 {
-  "summary": "Detailed summary of the text and findings",
+  "summary": "A brief, high-level summary of findings and core message (max 3 sentences)",
   "toneAnalysis": {
-    "overall": "Dominant emotion/attitude",
+    "overall": "Practical tone description (e.g., 'Professional with underlying urgency')",
     "emotions": [
-      { "name": "concerned", "value": 55, "color": "#F59E0B" },
-      { "name": "neutral", "value": 25, "color": "#6B7280" },
-      { "name": "frustrated", "value": 15, "color": "#EF4444" },
-      { "name": "hopeful", "value": 5, "color": "#3B82F6" }
+      { "name": "Emotion 1", "value": 60, "color": "#HEX" },
+      { "name": "Emotion 2", "value": 40, "color": "#HEX" }
     ]
   },
-  "intent": "The primary intent and requests identified",
-  "keySignals": ["Signal 1", "Signal 2"],
-  "riskFlags": ["Risk flag 1", "Risk flag 2"],
-  "importantDetails": ["Key detail 1", "Key detail 2"],
-  "suggestedNextActions": ["Next action 1", "Next action 2"],
-  "replyDraft": "A high-quality, contextual response draft",
+  "intent": "A precise, single-sentence statement of what the sender wants",
+  "keySignals": ["Key signal 1", "Key signal 2", "Key signal 3 (max 6 total)"],
+  "riskFlags": ["Real risk flag 1", "Real risk flag 2 (only real risks, no alarmism)"],
+  "importantDetails": ["Concrete fact 1 from input", "Concrete fact 2 from input"],
+  "suggestedNextActions": ["Practical action step 1", "Practical action step 2"],
+  "replyDraft": "A polished, ready-to-send draft response (max 3 sentences)",
   "clarityScore": 75,
-  "whatToCheckBeforeReplying": ["Checklist item 1", "Checklist item 2"]
+  "whatToCheckBeforeReplying": ["Specific check 1", "Specific check 2"]
 }
-Valid emotions (maximum 4): joyful=#10B981, hopeful=#3B82F6, neutral=#6B7280, concerned=#F59E0B, anxious=#F97316, frustrated=#EF4444, angry=#DC2626, sad=#6366F1.
+
+Allowed emotions for "toneAnalysis.emotions" (max 4, map values to sum to 100%):
+- joyful (#10B981)
+- hopeful (#3B82F6)
+- neutral (#6B7280)
+- concerned (#F59E0B)
+- anxious (#F97316)
+- frustrated (#EF4444)
+- angry (#DC2626)
+- sad (#6366F1)
+
 Return ONLY valid JSON.`;
 
 
@@ -214,7 +286,8 @@ async function tryGemini(prompt: string, systemInstruction: string, apiKey: stri
     }
 
     // Attempt parsing to verify valid JSON
-    return JSON.parse(jsonText);
+    const cleanText = cleanJSONText(jsonText);
+    return JSON.parse(cleanText);
 
   } catch (err: any) {
     clearTimeout(timeoutId);
@@ -260,12 +333,63 @@ async function tryOpenRouter(prompt: string, systemInstruction: string, apiKey: 
       throw new Error('OpenRouter API returned empty contents');
     }
 
-    return JSON.parse(content);
+    const cleanText = cleanJSONText(content);
+    return JSON.parse(cleanText);
 
   } catch (err: any) {
     clearTimeout(timeoutId);
     console.warn('[ai-analyze] OpenRouter fallback failed or returned invalid JSON:', err.message);
     return null;
+  }
+}
+
+async function checkUpstashRateLimit(ip: string): Promise<{ allowed: boolean; count?: number }> {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  
+  if (!url || !token) {
+    return { allowed: true }; // Upstash not configured -> fall back to local Map
+  }
+
+  const key = `sumalyze:ratelimit:${ip}`;
+  try {
+    const res = await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', key],
+        ['TTL', key],
+      ]),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Upstash API returned status ${res.status}`);
+    }
+
+    const data = (await res.json()) as Array<{ result: number; error?: string }>;
+    if (data[0]?.error) throw new Error(data[0].error);
+
+    const count = data[0].result;
+    const ttl = data[1].result;
+
+    // Set TTL on key creation (when TTL is -1)
+    if (ttl === -1) {
+      await fetch(`${url}/expire/${key}/60`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+
+    if (count > MAX_REQUESTS) {
+      return { allowed: false, count };
+    }
+    return { allowed: true, count };
+  } catch (err: any) {
+    console.warn('[ai-analyze] Upstash Redis rate limiting call failed, falling back to local memory rate limiting:', err.message);
+    return { allowed: true };
   }
 }
 
@@ -315,30 +439,49 @@ export const handler = async (event: NLEvent): Promise<NLResponse> => {
 
   if (isGuest) {
     const ip = getClientIp(event);
-    const now = Date.now();
+    let allowed = true;
+    let usedUpstash = false;
 
-    // Prune rateLimitMap if it exceeds limit size to prevent memory leaks
-    if (rateLimitMap.size > MAX_MAP_SIZE) {
-      for (const [key, record] of rateLimitMap.entries()) {
-        if (now - record.windowStart > WINDOW_MS) {
-          rateLimitMap.delete(key);
-        }
+    // 1. Try Upstash Redis Rate Limiting if configured
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      const upstashRes = await checkUpstashRateLimit(ip);
+      if (upstashRes.allowed === false) {
+        console.warn(`[ai-analyze] Guest IP ${ip} rate limited by Upstash Redis. Count: ${upstashRes.count}`);
+        return json(429, { error: 'Rate limit reached. Please wait a moment or sign in to increase your limits.' });
+      }
+      if (upstashRes.count !== undefined) {
+        usedUpstash = true;
       }
     }
 
-    const record = rateLimitMap.get(ip);
-    if (!record) {
-      rateLimitMap.set(ip, { count: 1, windowStart: now });
-    } else if (now - record.windowStart > WINDOW_MS) {
-      record.count = 1;
-      record.windowStart = now;
-    } else if (record.count >= MAX_REQUESTS) {
-      console.warn(`[ai-analyze] Guest IP ${ip} rate limited. Count: ${record.count}`);
-      return json(429, { error: 'Rate limit reached. Please wait a moment or sign in to increase your limits.' });
-    } else {
-      record.count += 1;
+    // 2. Fallback to in-memory rate limiting if Upstash wasn't configured or failed
+    if (!usedUpstash) {
+      const now = Date.now();
+
+      // Prune rateLimitMap if it exceeds limit size to prevent memory leaks
+      if (rateLimitMap.size > MAX_MAP_SIZE) {
+        for (const [key, record] of rateLimitMap.entries()) {
+          if (now - record.windowStart > WINDOW_MS) {
+            rateLimitMap.delete(key);
+          }
+        }
+      }
+
+      const record = rateLimitMap.get(ip);
+      if (!record) {
+        rateLimitMap.set(ip, { count: 1, windowStart: now });
+      } else if (now - record.windowStart > WINDOW_MS) {
+        record.count = 1;
+        record.windowStart = now;
+      } else if (record.count >= MAX_REQUESTS) {
+        console.warn(`[ai-analyze] Guest IP ${ip} rate limited by in-memory fallback. Count: ${record.count}`);
+        return json(429, { error: 'Rate limit reached. Please wait a moment or sign in to increase your limits.' });
+      } else {
+        record.count += 1;
+      }
     }
   }
+
 
   // Parse Body
   let body: { mode?: unknown; toolId?: unknown; goal?: unknown; inputText?: unknown };
@@ -377,7 +520,7 @@ export const handler = async (event: NLEvent): Promise<NLResponse> => {
     console.log('[ai-analyze] Triggering primary Gemini request...');
     const result = await tryGemini(cleanInput, systemPrompt, geminiKey);
     if (result) {
-      return json(200, result);
+      return json(200, normalizeAIResult(mode, result));
     }
   }
 
@@ -386,7 +529,7 @@ export const handler = async (event: NLEvent): Promise<NLResponse> => {
     console.log('[ai-analyze] Triggering OpenRouter fallback...');
     const result = await tryOpenRouter(cleanInput, systemPrompt, openrouterKey);
     if (result) {
-      return json(200, result);
+      return json(200, normalizeAIResult(mode, result));
     }
   }
 

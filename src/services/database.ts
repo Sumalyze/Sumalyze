@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import type { User } from '../lib/supabase';
 import { fetchAndCacheLimits } from './limits';
+import type { AnalysisHistoryRow, AgentRunRow, SavedOutputRow, UserFeedbackRow, AIToolResult, AIAgentStep } from '../types';
+
 
 // ─── User Profile Fallback Initialization ───────────────────────────────
 
@@ -54,8 +56,8 @@ export async function checkAndInitializeProfile(user: User): Promise<void> {
 export async function saveAnalysisHistory(
   inputText: string,
   analysisType: string,
-  results: any
-): Promise<{ data: any; error: Error | null }> {
+  results: AIToolResult
+): Promise<{ data: AnalysisHistoryRow | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('User not logged in') };
@@ -71,13 +73,13 @@ export async function saveAnalysisHistory(
       .select('*')
       .single();
 
-    return { data, error: error ? new Error(error.message) : null };
+    return { data: data as AnalysisHistoryRow | null, error: error ? new Error(error.message) : null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err : new Error('Unknown error saving history') };
   }
 }
 
-export async function getAnalysisHistory(): Promise<{ data: any[] | null; error: Error | null }> {
+export async function getAnalysisHistory(): Promise<{ data: AnalysisHistoryRow[] | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('User not logged in') };
@@ -88,7 +90,7 @@ export async function getAnalysisHistory(): Promise<{ data: any[] | null; error:
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    return { data, error: error ? new Error(error.message) : null };
+    return { data: data as AnalysisHistoryRow[] | null, error: error ? new Error(error.message) : null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err : new Error('Unknown error getting history') };
   }
@@ -112,10 +114,10 @@ export async function deleteAnalysisHistory(id: string): Promise<{ error: Error 
 
 export async function saveAgentRun(
   goal: string,
-  executionLog: any,
+  executionLog: AIAgentStep[],
   finalSummary: string | null,
-  status: string
-): Promise<{ data: any; error: Error | null }> {
+  status: 'running' | 'completed' | 'failed'
+): Promise<{ data: AgentRunRow | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('User not logged in') };
@@ -132,13 +134,13 @@ export async function saveAgentRun(
       .select('*')
       .single();
 
-    return { data, error: error ? new Error(error.message) : null };
+    return { data: data as AgentRunRow | null, error: error ? new Error(error.message) : null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err : new Error('Unknown error saving agent run') };
   }
 }
 
-export async function getAgentRuns(): Promise<{ data: any[] | null; error: Error | null }> {
+export async function getAgentRuns(): Promise<{ data: AgentRunRow[] | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('User not logged in') };
@@ -149,7 +151,7 @@ export async function getAgentRuns(): Promise<{ data: any[] | null; error: Error
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    return { data, error: error ? new Error(error.message) : null };
+    return { data: data as AgentRunRow[] | null, error: error ? new Error(error.message) : null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err : new Error('Unknown error getting agent runs') };
   }
@@ -175,8 +177,8 @@ export async function saveOutput(
   title: string,
   content: string,
   outputType: string,
-  metaData: any = {}
-): Promise<{ data: any; error: Error | null }> {
+  metaData: Record<string, any> = {}
+): Promise<{ data: SavedOutputRow | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('User not logged in') };
@@ -193,13 +195,13 @@ export async function saveOutput(
       .select('*')
       .single();
 
-    return { data, error: error ? new Error(error.message) : null };
+    return { data: data as SavedOutputRow | null, error: error ? new Error(error.message) : null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err : new Error('Unknown error saving output') };
   }
 }
 
-export async function getSavedOutputs(): Promise<{ data: any[] | null; error: Error | null }> {
+export async function getSavedOutputs(): Promise<{ data: SavedOutputRow[] | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('User not logged in') };
@@ -210,7 +212,7 @@ export async function getSavedOutputs(): Promise<{ data: any[] | null; error: Er
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    return { data, error: error ? new Error(error.message) : null };
+    return { data: data as SavedOutputRow[] | null, error: error ? new Error(error.message) : null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err : new Error('Unknown error getting saved outputs') };
   }
@@ -228,3 +230,36 @@ export async function deleteSavedOutput(id: string): Promise<{ error: Error | nu
     return { error: err instanceof Error ? err : new Error('Unknown error deleting saved output') };
   }
 }
+
+// ─── User Feedback ───────────────────────────────────────────────────────
+
+export async function saveUserFeedback(
+  feedbackType: 'bug' | 'suggestion' | 'other',
+  message: string,
+  rating: number | null
+): Promise<{ data: UserFeedbackRow | null; error: Error | null }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const feedbackData: Record<string, any> = {
+      feedback_type: feedbackType,
+      message,
+      rating,
+    };
+
+    if (user) {
+      feedbackData.user_id = user.id;
+    }
+
+    const { data, error } = await supabase
+      .from('user_feedback')
+      .insert(feedbackData)
+      .select('*')
+      .maybeSingle();
+
+    return { data: data as UserFeedbackRow | null, error: error ? new Error(error.message) : null };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err : new Error('Unknown error saving feedback') };
+  }
+}
+

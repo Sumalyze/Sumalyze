@@ -4,6 +4,9 @@ import { runSingleTool, type ToolResult } from '../services/ai';
 import { isLimitReached, incrementUsage, getRemainingUses, incrementServerUsage, fetchAndCacheLimits } from '../services/limits';
 import { useAuth } from '../hooks/useAuth';
 import { saveAnalysisHistory, saveOutput } from '../services/database';
+import { useToast } from '../components/Toast';
+import DocumentUpload from '../components/DocumentUpload';
+
 
 /* ─── Shared micro-components ──────────────────────────────────── */
 
@@ -43,6 +46,7 @@ function CopyButton({ text }: { text: string }) {
 
 function SaveOutputButton({ title, content, type }: { title: string; content: string; type: string }) {
   const { user } = useAuth();
+  const toast = useToast();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -53,9 +57,10 @@ function SaveOutputButton({ title, content, type }: { title: string; content: st
       const { error } = await saveOutput(title, content, type);
       if (error) throw error;
       setSaved(true);
+      toast.success('Clarity report saved successfully!');
       setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
-      alert(`Failed to save: ${err.message}`);
+      toast.error(`Failed to save: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -79,6 +84,7 @@ function SaveOutputButton({ title, content, type }: { title: string; content: st
 
 function ToolPanel({ tool, isLoggedIn }: { tool: ToolDef; isLoggedIn: boolean }) {
   const [text, setText] = useState('');
+  const [inputType, setInputType] = useState<'text' | 'file'>('text');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -168,25 +174,57 @@ function ToolPanel({ tool, isLoggedIn }: { tool: ToolDef; isLoggedIn: boolean })
 
       {/* Input */}
       <div style={{ padding: '16px 24px' }}>
-        <div style={{ position: 'relative' }}>
-          <textarea
-            value={text}
-            onChange={e => { setText(e.target.value); setError(null); }}
-            placeholder={tool.placeholder}
-            style={{
-              width: '100%', height: 120, background: 'rgba(10,0,15,0.5)',
-              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12,
-              padding: '12px 14px', fontSize: 13, color: 'rgba(255,255,255,0.8)',
-              resize: 'vertical', outline: 'none', fontFamily: 'inherit',
-              lineHeight: '20px', boxSizing: 'border-box', transition: 'border-color 0.2s',
-            }}
-            onFocus={e => e.target.style.borderColor = `${tool.accent}40`}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
-          />
-          <span style={{ position: 'absolute', bottom: 8, right: 10, fontSize: 10, color: text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
-            {text.length} chars
-          </span>
+        {/* Input tabs */}
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 3, marginBottom: 12 }}>
+          {(['text', 'file'] as const).map(type => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => { setInputType(type); setError(null); }}
+              style={{
+                flex: 1, padding: '6px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                cursor: 'pointer', transition: 'all 0.2s',
+                background: inputType === type ? `${tool.accent}12` : 'transparent',
+                border: inputType === type ? `1px solid ${tool.accent}25` : '1px solid transparent',
+                color: inputType === type ? 'white' : 'rgba(255,255,255,0.4)',
+                fontFamily: 'inherit',
+              }}
+            >
+              {type === 'text' ? '📋 Enter Text' : '📎 Upload Document'}
+            </button>
+          ))}
         </div>
+
+        {inputType === 'text' ? (
+          <div style={{ position: 'relative' }}>
+            <textarea
+              value={text}
+              onChange={e => { setText(e.target.value); setError(null); }}
+              placeholder={tool.placeholder}
+              style={{
+                width: '100%', height: 120, background: 'rgba(10,0,15,0.5)',
+                border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12,
+                padding: '12px 14px', fontSize: 13, color: 'rgba(255,255,255,0.8)',
+                resize: 'vertical', outline: 'none', fontFamily: 'inherit',
+                lineHeight: '20px', boxSizing: 'border-box', transition: 'border-color 0.2s',
+              }}
+              onFocus={e => e.target.style.borderColor = `${tool.accent}40`}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
+            />
+            <span style={{ position: 'absolute', bottom: 8, right: 10, fontSize: 10, color: text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
+              {text.length} chars
+            </span>
+          </div>
+        ) : (
+          <DocumentUpload
+            accentColor={tool.accent}
+            onTextExtracted={(extractedText) => {
+              setText(extractedText);
+              setError(null);
+            }}
+            onError={(err) => setError(err)}
+          />
+        )}
 
         {/* Error */}
         {error && (
@@ -376,7 +414,7 @@ export default function ToolsPage({ onSignIn }: { onSignIn: () => void }) {
             <p style={{ fontSize: 16 }}>No tools match "{search}"</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 20 }}>
             {filtered.map(tool => (
               <ToolPanel key={tool.id} tool={tool} isLoggedIn={isLoggedIn} />
             ))}

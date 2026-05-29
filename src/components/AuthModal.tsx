@@ -86,7 +86,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           position: 'fixed', inset: 0, zIndex: 999,
           background: 'rgba(0,0,0,0.7)',
           backdropFilter: 'blur(6px)',
-          animation: 'fadeUp 0.2s ease',
+          animation: 'backdropFadeIn 0.2s ease both',
         }}
       />
 
@@ -102,7 +102,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         borderRadius: 20,
         padding: '36px 28px',
         boxShadow: '0 32px 80px rgba(0,0,0,0.8)',
-        animation: 'fadeUp 0.25s ease',
+        animation: 'modalFadeInCenter 0.25s cubic-bezier(0.16, 1, 0.3, 1) both',
         boxSizing: 'border-box',
       }}>
         {/* Top gradient accent */}
