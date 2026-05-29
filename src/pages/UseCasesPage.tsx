@@ -256,16 +256,166 @@ export default function UseCasesPage({ onNavigateTools, onNavigateAgent }: { onN
           </div>
         </div>
 
-        {/* Support */}
-        <div style={{ marginTop: 48, textAlign: 'center' }}>
-          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', lineHeight: '22px' }}>
-            All of this is MVP free. If Sumalyze saves you time,{' '}
-            <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ color: '#ff8fa3', textDecoration: 'none' }}>
-              consider supporting us on Ko-fi ♥
-            </a>
-          </p>
-        </div>
+      {/* Relocated Built For Overview Section */}
+      <BuiltForOverview onSelectAudience={(aud) => {
+        setAudience(aud);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }} />
+
+      {/* Relocated Testimonials Section */}
+      <TestimonialsSection />
+
+      {/* Support */}
+      <div style={{ marginTop: 80, textAlign: 'center' }}>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', lineHeight: '22px' }}>
+          All of this is free. If Sumalyze saves you time,{' '}
+          <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ color: '#ff8fa3', textDecoration: 'none' }}>
+            consider supporting us on Ko-fi ♥
+          </a>
+        </p>
       </div>
+    </div>
     </div>
   );
 }
+
+/* ─── Shared Layout Components ───────────────────────────────── */
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(28px, 4vw, 42px)', lineHeight: '1.2', letterSpacing: '-0.02em', textAlign: 'center', margin: '0 0 16px', background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent' }}>
+      {children}
+    </h2>
+  );
+}
+
+function SectionDesc({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ fontSize: 16, color: 'rgba(239,237,253,0.6)', lineHeight: '26px', maxWidth: 500, margin: '0 auto', textAlign: 'center' }}>
+      {children}
+    </p>
+  );
+}
+
+/* ─── Built For Overview ───────────────────────────────────────── */
+
+function BuiltForOverview({ onSelectAudience }: { onSelectAudience: (aud: 'b2c' | 'b2b') => void }) {
+  return (
+    <section style={{ padding: '100px 0 60px', borderTop: '1px solid rgba(255,255,255,0.03)', marginTop: 80 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <SectionTitle>Whoever you are, we read the room.</SectionTitle>
+        <SectionDesc>Sumalyze works for individuals who handle messy communication and teams that process it at scale.</SectionDesc>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginTop: 48 }}>
+          {/* For individuals */}
+          <div style={{ background: 'rgba(255,255,255,0.013)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>For Individuals</span>
+              <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: '8px 0 6px', letterSpacing: '-0.02em' }}>Stop drowning in text.</h3>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '20px' }}>One person, one inbox, unlimited complexity. Sumalyze handles the reading so you can focus on the thinking.</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { icon: '🎓', label: 'Students', desc: 'Summarize papers, extract key arguments, study faster' },
+                { icon: '✍️', label: 'Creators', desc: 'Turn rough notes into polished posts and captions' },
+                { icon: '💼', label: 'Freelancers', desc: 'Understand client messages, draft better replies' },
+                { icon: '🔍', label: 'Job Seekers', desc: 'Decode job offers and recruiter messages' },
+              ].map(row => (
+                <div key={row.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{row.icon}</span>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: 'white', margin: 0 }}>{row.label}</p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', lineHeight: '16px' }}>{row.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => onSelectAudience('b2c')} style={{ padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500, border: '1px solid rgba(129,140,248,0.3)', background: 'rgba(129,140,248,0.08)', color: '#a5b4fc', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(129,140,248,0.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(129,140,248,0.08)'}>
+              Filter for Individual Use Cases ↑
+            </button>
+          </div>
+
+          {/* For teams */}
+          <div style={{ background: 'rgba(255,255,255,0.013)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>For Teams</span>
+              <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: '8px 0 6px', letterSpacing: '-0.02em' }}>Process communication at scale.</h3>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '20px' }}>Multiple inboxes, high volume, high stakes. Sumalyze helps teams move faster without missing signals.</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { icon: '🎧', label: 'Support Teams',        desc: 'Summarize complaints, draft empathetic replies fast' },
+                { icon: '📈', label: 'Sales Teams',          desc: 'Extract buying signals and objections from prospects' },
+                { icon: '👤', label: 'HR & Recruiting',      desc: 'Summarize candidate notes into structured briefs' },
+                { icon: '🏢', label: 'Agencies & Operators', desc: 'Process client feedback without losing the thread' },
+              ].map(row => (
+                <div key={row.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{row.icon}</span>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: 'white', margin: 0 }}>{row.label}</p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', lineHeight: '16px' }}>{row.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => onSelectAudience('b2b')} style={{ padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500, border: '1px solid rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.08)', color: '#34d399', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(52,211,153,0.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(52,211,153,0.08)'}>
+              Filter for Team Use Cases ↑
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Testimonials ───────────────────────────────────────────────── */
+
+const TESTIMONIALS = [
+  { quote: "Sumalyze flagged a manipulation attempt in a client email I was about to ignore. The Signals module saved the entire project.", name: "Marketing Lead", role: "Agency", initials: "ML" },
+  { quote: "I use it every morning to triage my inbox. The Brief + Pulse combo alone saves me 30 minutes a day.", name: "Freelancer", role: "Independent", initials: "FR" },
+  { quote: "The fact that it's completely MVP free blew my mind. The reply suggestions are genuinely good — like having an editor on call.", name: "Support Manager", role: "SaaS", initials: "SM" },
+  { quote: "I used the Intent module to prep for a negotiation. Spotted the leverage the other party was hiding in plain sight.", name: "Founder", role: "Startup", initials: "FO" },
+  { quote: "Clean + Rewrite turned my rushed draft into something I was actually proud to send. Took 10 seconds.", name: "Content Writer", role: "Media", initials: "CW" },
+  { quote: "As someone who struggles with reading tone in texts, Pulse has genuinely changed how I communicate.", name: "Remote Worker", role: "Tech", initials: "RW" },
+];
+
+function TestimonialsSection() {
+  return (
+    <section style={{ padding: '60px 0 40px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <SectionTitle>What people say</SectionTitle>
+        <SectionDesc>Feedback and impressions from users and testers who use Sumalyze to read the room.</SectionDesc>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginTop: 52 }} className="testimonials-masonry">
+          <style>{`
+            @media(min-width: 900px) {
+              .testimonials-masonry {
+                grid-template-columns: repeat(3, 1fr) !important;
+              }
+              .testimonials-masonry > div:nth-child(3n+2) {
+                transform: translateY(16px);
+              }
+            }
+          `}</style>
+          {TESTIMONIALS.map((t, idx) => (
+            <div key={idx} id={`testimonial-${idx}`} className="hover-card" style={{ background: 'rgba(255,255,255,0.012)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: '28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: '24px', flex: 1, fontStyle: 'italic' }}>"{t.quote}"</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(226,62,87,0.15)', border: '1px solid rgba(226,62,87,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#ff8fa3', flexShrink: 0 }}>{t.initials}</div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.8)' }}>{t.name}</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>{t.role}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+

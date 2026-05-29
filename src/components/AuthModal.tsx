@@ -281,7 +281,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </form>
 
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginTop: 20 }}>
-          MVP Free · No credit card · Nonprofit
+          MVP Free · No credit card · Independent project
         </p>
       </div>
     </>

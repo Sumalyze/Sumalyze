@@ -44,7 +44,7 @@ export default function Hero({ onTryDemo }: HeroProps) {
         {/* Badge */}
         <div className="badge animate-slide-up delay-0 mb-8 mx-auto w-fit">
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#E23E57', display: 'inline-block' }} />
-          Free · Nonprofit · No Paywalls
+          Free · Independent · No Paywalls
         </div>
 
         {/* Headline */}
@@ -90,7 +90,7 @@ export default function Hero({ onTryDemo }: HeroProps) {
 
         {/* Social proof micro-text */}
         <p className="animate-fade-in delay-700 text-muted text-sm mt-6">
-          100% free · No sign-up required · Nonprofit mission
+          100% free · No sign-up required · Independent project
         </p>
 
         {/* Product Preview Card */}

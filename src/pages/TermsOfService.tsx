@@ -54,7 +54,7 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
 
           <Section title="About Sumalyze">
             <p>
-              Sumalyze is a nonprofit AI communication intelligence platform. By using Sumalyze (either as a guest or as a registered account holder), you agree to these terms. If you do not agree, please do not use the workspace.
+              Sumalyze is an independent AI communication intelligence platform. By using Sumalyze (either as a guest or as a registered account holder), you agree to these terms. If you do not agree, please do not use the workspace.
             </p>
           </Section>
 
@@ -109,7 +109,7 @@ export default function TermsOfService({ onClose }: { onClose: () => void }) {
 
           <Section title="Donations via Ko-fi">
             <p>
-              Support contributions via Ko-fi are completely voluntary and nonprofit donations. Donations do not entitle you to any specific Service Level Agreements, features, or refunds.
+              Support contributions via Ko-fi are completely voluntary. Contributions do not entitle you to any specific Service Level Agreements, features, or refunds.
             </p>
           </Section>
 

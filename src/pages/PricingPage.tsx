@@ -437,6 +437,9 @@ export default function PricingPage() {
         </div>
       </div>
 
+      {/* Relocated Mission / Ledgers Section */}
+      <MissionSection />
+
       {/* Waitlist Modal (Centered immediately overlay) */}
       {waitlistPlan && (
         <>
@@ -547,5 +550,105 @@ export default function PricingPage() {
         </>
       )}
     </div>
+  );
+}
+
+/* ─── Shared Layout Components ───────────────────────────────── */
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(28px, 4vw, 42px)', lineHeight: '1.2', letterSpacing: '-0.02em', textAlign: 'center', margin: '0 0 16px', background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent' }}>
+      {children}
+    </h2>
+  );
+}
+
+function SectionDesc({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ fontSize: 16, color: 'rgba(239,237,253,0.6)', lineHeight: '26px', maxWidth: 500, margin: '0 auto', textAlign: 'center' }}>
+      {children}
+    </p>
+  );
+}
+
+/* ─── Relocated Mission / cost ledger ─────────────────────────────── */
+
+function MissionSection() {
+  return (
+    <section id="mission" style={{ padding: '120px 0 60px', borderTop: '1px solid rgba(255,255,255,0.03)', marginTop: 80, background: 'rgba(226,62,87,0.01)' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <SectionTitle>MVP Free first, supported by you</SectionTitle>
+        <SectionDesc>We believe advanced text comprehension tools should be private and open. Sumalyze is an independent project.</SectionDesc>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, marginTop: 48, alignItems: 'center' }} className="mission-grid-layout">
+          <style>{`
+            @media(max-width: 768px) {
+              .mission-grid-layout {
+                grid-template-columns: 1fr !important;
+              }
+            }
+          `}</style>
+          
+          {/* Left Column: Philosophical overview */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <h3 style={{ fontSize: 24, fontWeight: 500, color: 'white' }}>No paywalls. No subscription trap.</h3>
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: '1.7' }}>
+              Most AI productivity tools want a monthly subscription before you can even paste your first document. We built Sumalyze on a different philosophy: it should be accessible to anyone.
+            </p>
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: '1.7' }}>
+              We do not run advertisements, we do not track your search history, and we do not sell your document data. We are kept online purely through small, voluntary contributions from readers who find our workspace useful.
+            </p>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
+              {['No credit card required', 'No tracking pixels', 'Independent project'].map(val => (
+                <span key={val} style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#34d399' }}>✓</span> {val}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column: Ledger Transparency Card */}
+          <div className="hover-card" style={{
+            background: 'linear-gradient(145deg, rgba(226,62,87,0.1) 0%, rgba(10,0,15,0.4) 100%)',
+            border: '1px solid rgba(226,62,87,0.22)',
+            borderRadius: 20, padding: 28,
+            boxShadow: '0 16px 40px rgba(0,0,0,0.4)'
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8fa3', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Project Ledgers</span>
+            <h4 style={{ fontSize: 18, fontWeight: 600, color: 'white', marginTop: 4, marginBottom: 16 }}>Hosting Cost Coverage</h4>
+            
+            {/* Cost Ledger Rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 16, marginBottom: 16 }}>
+              {[
+                { item: 'AI API Processing', cost: '$0.001 / query' },
+                { item: 'Server Hosting & Database', cost: '$45 / month' },
+                { item: 'SSL & Domain Maintenance', cost: '$12 / year' }
+              ].map(row => (
+                <div key={row.item} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.item}</span>
+                  <span style={{ color: 'white', fontFamily: 'monospace' }}>{row.cost}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Average Coffee Support</p>
+                <p style={{ fontSize: 20, fontWeight: 600, color: 'white' }}>$3.00 / donor</p>
+              </div>
+              <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
+                className="hover-glow"
+                style={{
+                  padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, color: 'white', textDecoration: 'none',
+                  background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+                  boxShadow: '0 4px 14px rgba(226,62,87,0.3)', display: 'inline-flex', alignItems: 'center', gap: 6
+                }}>
+                ☕ Support on Ko-fi
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

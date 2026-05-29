@@ -7,6 +7,7 @@ import FeedbackModal from './components/FeedbackModal';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import ToolsPage from './pages/ToolsPage';
+import ToolDetailPage from './pages/ToolDetailPage';
 import AgentPage from './pages/AgentPage';
 import WorkflowsPage from './pages/WorkflowsPage';
 import UseCasesPage from './pages/UseCasesPage';
@@ -15,6 +16,7 @@ import PricingPage from './pages/PricingPage';
 import sumalyzeLogo from './assets/sumalyzelogo.png';
 import { ToastProvider } from './components/Toast';
 import { parseFile } from './utils/fileParser';
+import { TOOLS } from './data/tools';
 
 
 
@@ -22,7 +24,7 @@ import { parseFile } from './utils/fileParser';
    Sumalyze — AI Clarity Workspace
    ============================================================ */
 
-type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing';
+type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing';
 
 const hashToPathMap: Record<string, string> = {
   tools: '/tools',
@@ -37,6 +39,7 @@ const hashToPathMap: Record<string, string> = {
 
 export default function App() {
   const [page, setPage] = useState<Page>('home');
+  const [toolSlug, setToolSlug] = useState<string>('');
   const [authOpen, setAuthOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
@@ -55,8 +58,15 @@ export default function App() {
       const path = window.location.pathname;
       if (path === '/' || path === '/index.html') {
         setPage('home');
+        setToolSlug('');
       } else if (path === '/tools') {
         setPage('tools');
+        setToolSlug('');
+      } else if (path.startsWith('/tools/')) {
+        // Individual tool page
+        const slug = path.replace('/tools/', '');
+        setToolSlug(slug);
+        setPage('tooldetail');
       } else if (path === '/agent') {
         setPage('agent');
       } else if (path === '/workflows') {
@@ -73,6 +83,7 @@ export default function App() {
         setPage('terms');
       } else {
         setPage('home');
+        setToolSlug('');
       }
     };
 
@@ -94,6 +105,22 @@ export default function App() {
     }
   };
 
+  /** Navigate to a specific tool by slug */
+  const navigateToTool = (slug: string) => {
+    const path = `/tools/${slug}`;
+    window.history.pushState(null, '', path);
+    setToolSlug(slug);
+    setPage('tooldetail');
+  };
+
+  /** Navigate to any path string (used by ToolDetailPage) */
+  const navigatePath = (path: string) => {
+    if (path === '/tools') { navigate('tools'); return; }
+    if (path.startsWith('/tools/')) { navigateToTool(path.replace('/tools/', '')); return; }
+    if (path === '/agent') { navigate('agent'); return; }
+    navigate('home');
+  };
+
   if (page === 'privacy') return <ToastProvider><AuthProvider><PrivacyPolicy onClose={() => navigate('home')} /></AuthProvider></ToastProvider>;
   if (page === 'terms')   return <ToastProvider><AuthProvider><TermsOfService onClose={() => navigate('home')} /></AuthProvider></ToastProvider>;
 
@@ -101,11 +128,16 @@ export default function App() {
     <ToastProvider>
       <AuthProvider>
         <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', overflowX: 'hidden', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-          <Header onLoginClick={() => setAuthOpen(true)} onNavigate={navigate} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
+          <Header onLoginClick={() => setAuthOpen(true)} onNavigate={navigate} onNavigateTool={navigateToTool} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
 
           {page === 'tools' && (
             <div className="page-enter">
-              <ToolsPage onSignIn={() => setAuthOpen(true)} />
+              <ToolsPage onSignIn={() => setAuthOpen(true)} onNavigateTool={navigateToTool} />
+            </div>
+          )}
+          {page === 'tooldetail' && (
+            <div className="page-enter">
+              <ToolDetailPage slug={toolSlug} onNavigate={navigatePath} onSignIn={() => setAuthOpen(true)} />
             </div>
           )}
           {page === 'agent' && (
@@ -139,11 +171,6 @@ export default function App() {
               <FromToolToAgentSection onNavigate={navigate} />
               <AudienceSection />
               <DemoSection />
-              <InteractiveToneSection />
-              <BentoModulesSection />
-              <BuiltForSection onNavigate={navigate} />
-              <MissionSection />
-              <TestimonialsSection />
               <FinalCTA onNavigate={navigate} />
             </>
           )}
@@ -160,9 +187,11 @@ export default function App() {
 /* ============================================================
    HEADER — Clean nav: Home, Tools, Agent, More dropdown
    ============================================================ */
-function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
+
+function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
   onLoginClick: () => void;
   onNavigate: (p: Page) => void;
+  onNavigateTool: (slug: string) => void;
   onFeedbackClick: () => void;
   currentPage: Page;
 }) {
@@ -170,6 +199,8 @@ function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 10);
@@ -177,14 +208,15 @@ function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
     return () => window.removeEventListener('scroll', h);
   }, []);
 
-  // Close More dropdown when clicking outside or pressing Escape
+  // Close dropdowns when clicking outside or pressing Escape
   useEffect(() => {
-    if (!moreOpen) return;
+    if (!moreOpen && !toolsOpen) return;
     const close = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('[data-more-dropdown]')) setMoreOpen(false);
+      if (!(e.target as HTMLElement).closest('[data-tools-dropdown]')) setToolsOpen(false);
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMoreOpen(false);
+      if (e.key === 'Escape') { setMoreOpen(false); setToolsOpen(false); }
     };
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', handleKeyDown);
@@ -192,13 +224,7 @@ function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
       document.removeEventListener('mousedown', close);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [moreOpen]);
-
-  const mainNavLinks: { label: string; page: Page }[] = [
-    { label: 'Tools',  page: 'tools' },
-    { label: 'Agent',  page: 'agent' },
-    { label: 'Pricing', page: 'pricing' },
-  ];
+  }, [moreOpen, toolsOpen]);
 
   const moreLinks: { label: string; page?: Page; href?: string; onClick?: () => void }[] = [
     { label: 'Workflows',  page: 'workflows' },
@@ -236,9 +262,71 @@ function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
         }} className="header-nav-desktop">
           {/* Home */}
           <NavPillItem label="Home" active={currentPage === 'home'} onClick={() => onNavigate('home')} />
-          {mainNavLinks.map(l => (
-            <NavPillItem key={l.page} label={l.label} active={currentPage === l.page} onClick={() => onNavigate(l.page)} />
-          ))}
+
+          {/* Tools dropdown */}
+          <div style={{ position: 'relative' }} data-tools-dropdown>
+            <button
+              onClick={() => { setToolsOpen(o => !o); setMoreOpen(false); }}
+              aria-haspopup="true"
+              aria-expanded={toolsOpen}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 13, color: (toolsOpen || currentPage === 'tools') ? 'white' : 'rgba(255,255,255,0.7)', fontWeight: (toolsOpen || currentPage === 'tools') ? 600 : 500,
+                padding: '6px 12px', borderRadius: 6, background: (toolsOpen || currentPage === 'tools') ? 'rgba(226,62,87,0.1)' : 'transparent',
+                border: 'none', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit',
+              }}
+            >
+              Tools
+              <span style={{ fontSize: 9, opacity: 0.5, transform: toolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+            </button>
+            {toolsOpen && (
+              <div data-tools-dropdown style={{
+                position: 'absolute', top: 'calc(100% + 10px)', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(12,4,20,0.98)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 16, padding: '16px',
+                minWidth: 560,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(226,62,87,0.08)',
+                zIndex: 200,
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+              }}>
+                {TOOLS.map(tool => (
+                  <button key={tool.id}
+                    onClick={() => { setToolsOpen(false); onNavigateTool(tool.slug); }}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 12,
+                      padding: '12px 14px', borderRadius: 12,
+                      background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      textAlign: 'left', transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${tool.accent}12`}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                      background: `${tool.accent}12`, border: `1px solid ${tool.accent}20`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: tool.accent
+                    }}>
+                      {tool.icon}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'white', margin: 0, lineHeight: '1.2' }}>{tool.name}</p>
+                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: '3px 0 0', lineHeight: '1.4' }}>{tool.description}</p>
+                    </div>
+                  </button>
+                ))}
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0', paddingTop: 10 }}>
+                  <button onClick={() => { setToolsOpen(false); onNavigate('tools'); }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(226,62,87,0.08)', border: '1px solid rgba(226,62,87,0.2)', color: '#ff8fa3', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    View all tools →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <NavPillItem label="Agent" active={currentPage === 'agent'} onClick={() => onNavigate('agent')} />
+          <NavPillItem label="Pricing" active={currentPage === 'pricing'} onClick={() => onNavigate('pricing')} />
           {user && (
             <NavPillItem label="History" active={currentPage === 'history'} onClick={() => onNavigate('history')} />
           )}
@@ -343,17 +431,16 @@ function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
           display: 'flex', flexDirection: 'column', gap: 2,
         }}>
           {[
-            { label: 'Home', page: 'home' },
-            { label: 'Tools', page: 'tools' },
-            { label: 'Agent', page: 'agent' },
-            { label: 'Pricing', page: 'pricing' },
-            ...(user ? [{ label: 'History', page: 'history' }] : []),
-            { label: 'Workflows', page: 'workflows' },
-            { label: 'Use Cases', page: 'usecases' },
+            { label: 'Home', page: 'home' as Page },
+            { label: 'Agent', page: 'agent' as Page },
+            { label: 'Pricing', page: 'pricing' as Page },
+            ...(user ? [{ label: 'History', page: 'history' as Page }] : []),
+            { label: 'Workflows', page: 'workflows' as Page },
+            { label: 'Use Cases', page: 'usecases' as Page },
           ].map((l) => (
             <button
               key={l.label}
-              onClick={() => { onNavigate(l.page as Page); setMobileMenuOpen(false); }}
+              onClick={() => { onNavigate(l.page); setMobileMenuOpen(false); }}
               style={{
                 padding: '11px 12px', borderRadius: 10, fontSize: 15, fontWeight: 500,
                 display: 'block', textAlign: 'left', background: currentPage === l.page ? 'rgba(226,62,87,0.08)' : 'none',
@@ -364,6 +451,63 @@ function Header({ onLoginClick, onNavigate, onFeedbackClick, currentPage }: {
               {l.label}
             </button>
           ))}
+
+          {/* Mobile Tools accordion */}
+          <div>
+            <button
+              onClick={() => setMobileToolsOpen(o => !o)}
+              style={{
+                width: '100%', padding: '11px 12px', borderRadius: 10, fontSize: 15, fontWeight: 500,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: (currentPage === 'tools' || currentPage === 'tooldetail') ? 'rgba(226,62,87,0.08)' : 'none',
+                border: 'none', cursor: 'pointer',
+                color: (currentPage === 'tools' || currentPage === 'tooldetail') ? '#ff8fa3' : 'rgba(255,255,255,0.75)',
+                fontFamily: 'inherit',
+              }}
+            >
+              <span>Tools</span>
+              <span style={{ fontSize: 10, opacity: 0.5, transform: mobileToolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+            </button>
+            {mobileToolsOpen && (
+              <div style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                <button
+                  onClick={() => { onNavigate('tools'); setMobileMenuOpen(false); setMobileToolsOpen(false); }}
+                  style={{
+                    width: '100%', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                    display: 'block', textAlign: 'center', background: 'rgba(226,62,87,0.08)',
+                    border: '1px solid rgba(226,62,87,0.2)', cursor: 'pointer',
+                    color: '#ff8fa3', fontFamily: 'inherit', marginBottom: 4,
+                  }}
+                >
+                  All Tools directory →
+                </button>
+                {TOOLS.map(tool => (
+                  <button
+                    key={tool.id}
+                    onClick={() => { onNavigateTool(tool.slug); setMobileMenuOpen(false); setMobileToolsOpen(false); }}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer',
+                      color: 'rgba(255,255,255,0.85)', fontFamily: 'inherit',
+                    }}
+                  >
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                      background: `${tool.accent}12`, border: `1px solid ${tool.accent}20`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: tool.accent
+                    }}>
+                      {tool.icon}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: 'white', margin: 0 }}>{tool.name}</p>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', margin: '1px 0 0', lineHeight: '1.2' }}>{tool.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => { onFeedbackClick(); setMobileMenuOpen(false); }}
             style={{
@@ -618,13 +762,14 @@ function SparkleIcon() {
 }
 
 function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
+  const { user } = useAuth();
   const scrollToDemo = () => {
     const el = document.getElementById('demo');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <section style={{ paddingTop: 'clamp(100px, 12vw, 160px)', paddingBottom: '80px', position: 'relative' }}>
+    <section style={{ paddingTop: 'clamp(100px, 12vw, 160px)', paddingBottom: '140px', position: 'relative' }}>
       {/* Background radial glow */}
       <div style={{ position: 'absolute', top: -173, left: '50%', transform: 'translateX(-50%)', width: 1440, height: 900, background: 'radial-gradient(40% 60% at 50% 30%, rgba(226,62,87,0.06) 0%, rgba(10,0,15,0) 100%)', pointerEvents: 'none', zIndex: 1 }} />
 
@@ -633,13 +778,11 @@ function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
           
           {/* Left Column: Headline, copy, CTAs */}
           <div style={{ textAlign: 'left' }}>
-            {/* AI Badge */}
-            <div className="animate-reveal" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '5px 14px 5px 10px', borderRadius: 32,
-              backdropFilter: 'blur(6px)', boxShadow: 'inset 0 -7px 11px rgba(226,62,87,0.12)',
-              border: '1px solid rgba(226,62,87,0.25)', background: 'rgba(226,62,87,0.06)' }}>
+            {/* AI label — editorial, not a badge */}
+            <div className="animate-reveal" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
               <SparkleIcon />
-              <span style={{ background: 'linear-gradient(90deg, #ff8fa3 0%, #E23E57 50%, #ff8fa3 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em' }}>
-                AI CLARITY WORKSPACE ✧
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                AI Clarity Workspace
               </span>
             </div>
 
@@ -660,11 +803,19 @@ function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
             {/* CTA Buttons */}
             <div className="animate-reveal delay-200 hero-buttons" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
-              <button onClick={() => onNavigate('agent')}
-                className="hover-glow"
-                style={{ padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.25)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.14)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.3)', backdropFilter: 'blur(8px)', fontFamily: 'inherit' }}>
-                Try Agent Mode ✧
-              </button>
+              {user ? (
+                <button onClick={() => onNavigate('tools')}
+                  className="hover-glow"
+                  style={{ padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.25)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.14)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.3)', backdropFilter: 'blur(8px)', fontFamily: 'inherit' }}>
+                  Open workspace
+                </button>
+              ) : (
+                <button onClick={() => onNavigate('agent')}
+                  className="hover-glow"
+                  style={{ padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.25)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.14)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.3)', backdropFilter: 'blur(8px)', fontFamily: 'inherit' }}>
+                  Try Agent Mode
+                </button>
+              )}
               <button onClick={scrollToDemo}
                 className="hover-glow"
                 style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(8px)', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -722,9 +873,8 @@ function FromToolToAgentSection({ onNavigate }: { onNavigate: (p: Page) => void 
   ];
 
   return (
-    <section style={{ padding: '80px 20px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+    <section style={{ padding: '140px 20px 120px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>From Tool to Agent</SectionBadge>
         <SectionTitle>One platform. Three modes of clarity.</SectionTitle>
         <SectionDesc>Use a single tool when you know what you need. Run the Agent when you want everything at once.</SectionDesc>
 
@@ -807,9 +957,8 @@ function AudienceSection() {
   };
 
   return (
-    <section style={{ padding: '80px 20px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+    <section style={{ padding: '120px 20px 140px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>Who It's For</SectionBadge>
         <SectionTitle>Built for people who hate long text</SectionTitle>
         <SectionDesc>Tailored intelligence modules customized for whatever you read and write daily.</SectionDesc>
 
@@ -872,8 +1021,8 @@ function AudienceSection() {
    ============================================================ */
 function DemoSection() {
   return (
-    <section id="features" style={{ padding: '80px 20px', background: 'rgba(10,0,15,0.3)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <section id="features" style={{ padding: '140px 20px', background: 'rgba(10,0,15,0.3)' }}>
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <DemoPanel />
       </div>
     </section>
@@ -999,152 +1148,110 @@ function DemoPanel() {
     if (file) handleFileUpload(file);
   };
 
-  const samples = [
-    { label: 'Passive-aggressive', text: "I guess if you're too busy to respond to emails, that's fine. I'll just keep waiting." },
-    { label: 'Urgent escalation', text: "This is critical — if we don't resolve this today the client will cancel the contract." },
-    { label: 'Scam attempt', text: "Congratulations! You've been selected for a $5,000 grant. Send your bank details and $150 processing fee immediately." },
-  ];
-
   const canAnalyze = text.trim().length >= 10 && text.trim().length <= MAX_TEXT && !loading && !isLimitReached;
 
   return (
     <div id="demo" style={{ marginTop: 20 }}>
-      <SectionBadge>Live Workspace</SectionBadge>
       <SectionTitle>Summarize anything in seconds</SectionTitle>
-      <SectionDesc>Experience the live parsing engine. Load a document preset or paste your own chaotic text below.</SectionDesc>
+      <SectionDesc>Experience the live parsing engine. Paste your own chaotic text or upload a document below.</SectionDesc>
 
-      {/* Grid containing Presets Sidebar and Main Area */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: 24, marginTop: 48, alignItems: 'start' }} className="demo-grid-layout">
-        <style>{`
-          @media(max-width: 768px) {
-            .demo-grid-layout {
-              grid-template-columns: 1fr !important;
-            }
-          }
-        `}</style>
-        
-        {/* Left Side: Preset Sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 18 }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Document Inbox</p>
-          {samples.map(s => {
-            const isSelected = text === s.text;
-            return (
-              <button key={s.label} onClick={() => { setText(s.text); setTab('paste'); setResult(null); setError(null); setUploadedFileName(null); }}
-                style={{
-                  textAlign: 'left', padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-                  color: isSelected ? '#ff8fa3' : 'rgba(255,255,255,0.6)',
-                  background: isSelected ? 'rgba(226,62,87,0.08)' : 'rgba(255,255,255,0.02)',
-                  border: isSelected ? '1px solid rgba(226,62,87,0.25)' : '1px solid rgba(255,255,255,0.05)',
-                  cursor: 'pointer', transition: 'all 0.2s',
-                  display: 'flex', flexDirection: 'column', gap: 2
-                }}
-                onMouseEnter={e => { if(!isSelected) { e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } }}
-                onMouseLeave={e => { if(!isSelected) { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; } }}>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>📄 {s.label}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 180 }}>{s.text}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Right Side: The Main Demo Panel */}
-        <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)' }}>
-          {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            {(['paste', 'upload'] as const).map(t => (
-              <button key={t} onClick={() => { setTab(t); setError(null); }}
-                style={{ padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: tab === t ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent', background: tab === t ? 'rgba(226,62,87,0.1)' : 'transparent', color: tab === t ? '#ff8fa3' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }}>
-                {t === 'paste' ? '📋 Paste Text' : '📎 Upload File'}
-              </button>
-            ))}
-            {(text || uploadedFileName) && (
-              <button onClick={() => { setText(''); setResult(null); setError(null); setUploadedFileName(null); }} style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
-            )}
-          </div>
-
-          <div style={{ padding: '20px' }}>
-            {tab === 'paste' ? (
-              <div style={{ position: 'relative' }}>
-                {uploadedFileName && (
-                  <div style={{ marginBottom: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 12, color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    📄 {uploadedFileName} · {text.length.toLocaleString()} characters loaded
-                  </div>
-                )}
-                <textarea value={text} onChange={e => { setText(e.target.value); setError(null); }}
-                  placeholder="Paste an email, message, contract snippet, or any text you want to analyze..."
-                  style={{ width: '100%', height: 180, background: 'rgba(10,0,15,0.6)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 16, fontSize: 14, color: 'rgba(255,255,255,0.8)', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: '22px', boxSizing: 'border-box' }}
-                  onFocus={e => e.target.style.borderColor = 'rgba(226,62,87,0.3)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: text.length > MAX_TEXT ? '#fca5a5' : text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
-                    {text.length.toLocaleString()} / {MAX_TEXT.toLocaleString()}{text.length > 0 && text.length < 10 ? ' · min 10' : text.length > MAX_TEXT ? ' · too long' : ''}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div
-                onDrop={handleDrop}
-                onDragOver={e => e.preventDefault()}
-                onClick={() => { if (!parsing) fileInputRef.current?.click(); }}
-                style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: parsing ? 'not-allowed' : 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
-                onMouseEnter={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'; }}
-                onMouseLeave={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}
-              >
-                {parsing ? (
-                  <>
-                    <span style={{ fontSize: 24, animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⏳</span>
-                    <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Parsing document...</p>
-                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Extracting text content locally...</p>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ fontSize: 32 }}>📄</span>
-                    <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop document here or click to browse</p>
-                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>PDF, DOCX, TXT supported · Max 5MB</p>
-                  </>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  style={{ display: 'none' }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
-                />
-              </div>
-            )}
-
-            {/* Error message */}
-            {error && (
-              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 8 }}>
-                ⚠ {error}
-              </div>
-            )}
-
-            {isLimitReached && (
-              <div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', fontSize: 13, color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span>Daily MVP free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for unlimited access.</span>
-              </div>
-            )}
-            <button onClick={analyze} disabled={!canAnalyze}
-              style={{
-                width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500,
-                cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none',
-                background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
-                color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white',
-                boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
-                transition: 'all 0.25s', fontFamily: 'inherit',
-                animation: loading ? 'premiumPulse 1.5s ease-in-out infinite' : 'none'
-              }}>
-              {loading ? '⏳ Analyzing with AI...' : '⚡ Analyze with Sumalyze'}
+      {/* Main Demo Panel */}
+      <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', marginTop: 48 }}>
+        {/* Tab bar */}
+        <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+          {(['paste', 'upload'] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); setError(null); }}
+              style={{ padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: tab === t ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent', background: tab === t ? 'rgba(226,62,87,0.1)' : 'transparent', color: tab === t ? '#ff8fa3' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }}>
+              {t === 'paste' ? '📋 Paste Text' : '📎 Upload File'}
             </button>
-          </div>
-
-          {/* Results */}
-          {result && <ResultGrid result={result} />}
-          {result && <FeedbackWidget key={result.brief} />}
-          {result && <ResultKoFiCTA />}
+          ))}
+          {(text || uploadedFileName) && (
+            <button onClick={() => { setText(''); setResult(null); setError(null); setUploadedFileName(null); }} style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
+          )}
         </div>
+
+        <div style={{ padding: '20px' }}>
+          {tab === 'paste' ? (
+            <div style={{ position: 'relative' }}>
+              {uploadedFileName && (
+                <div style={{ marginBottom: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 12, color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  📄 {uploadedFileName} · {text.length.toLocaleString()} characters loaded
+                </div>
+              )}
+              <textarea value={text} onChange={e => { setText(e.target.value); setError(null); }}
+                placeholder="Paste an email, message, contract snippet, or any text you want to analyze..."
+                style={{ width: '100%', height: 180, background: 'rgba(10,0,15,0.6)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 16, fontSize: 14, color: 'rgba(255,255,255,0.8)', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: '22px', boxSizing: 'border-box' }}
+                onFocus={e => e.target.style.borderColor = 'rgba(226,62,87,0.3)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <span style={{ fontSize: 11, color: text.length > MAX_TEXT ? '#fca5a5' : text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
+                  {text.length.toLocaleString()} / {MAX_TEXT.toLocaleString()}{text.length > 0 && text.length < 10 ? ' · min 10' : text.length > MAX_TEXT ? ' · too long' : ''}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div
+              onDrop={handleDrop}
+              onDragOver={e => e.preventDefault()}
+              onClick={() => { if (!parsing) fileInputRef.current?.click(); }}
+              style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: parsing ? 'not-allowed' : 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
+              onMouseEnter={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'; }}
+              onMouseLeave={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}
+            >
+              {parsing ? (
+                <>
+                  <span style={{ fontSize: 24, animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⏳</span>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Parsing document...</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Extracting text content locally...</p>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 32 }}>📄</span>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop document here or click to browse</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>PDF, DOCX, TXT supported · Max 5MB</p>
+                </>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+              />
+            </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 8 }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          {isLimitReached && (
+            <div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', fontSize: 13, color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <span>Daily MVP free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for unlimited access.</span>
+            </div>
+          )}
+          <button onClick={analyze} disabled={!canAnalyze}
+            style={{
+              width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500,
+              cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none',
+              background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+              color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white',
+              boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
+              transition: 'all 0.25s', fontFamily: 'inherit',
+              animation: loading ? 'premiumPulse 1.5s ease-in-out infinite' : 'none'
+            }}>
+            {loading ? '⏳ Analyzing with AI...' : '⚡ Analyze with Sumalyze'}
+          </button>
+        </div>
+
+        {/* Results */}
+        {result && <ResultGrid result={result} />}
+        {result && <FeedbackWidget key={result.brief} />}
+        {result && <ResultKoFiCTA />}
       </div>
     </div>
   );
@@ -1194,7 +1301,7 @@ function ResultKoFiCTA() {
             ♥ Find this analysis helpful?
           </p>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: '18px' }}>
-            Sumalyze is completely MVP free and run by a nonprofit. A small Ko-fi donation helps keep the servers running.
+            Sumalyze is an independent project. A small Ko-fi contribution helps keep the servers running.
           </p>
         </div>
         <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
@@ -1321,558 +1428,13 @@ function ResultGrid({ result }: { result: AnalysisResult }) {
 }
 
 /* ============================================================
-   INTERACTIVE TONE SECTION — "Understand tone before you reply"
-   ============================================================ */
-function InteractiveToneSection() {
-  const toneDemos = [
-    {
-      label: "The Vague Request",
-      original: "Hey, we need that thing we talked about done soon. Let me know when it's ready.",
-      analysis: "High uncertainty (70% vagueness). Key context (what 'thing' is, when 'soon' is) is completely missing.",
-      intent: "They want progress but haven't specified the scope, placing the burden of clarification on you.",
-      reply: "Hi there! Just to confirm, are we referring to the homepage redesign draft? If so, I can have that ready by Friday 2 PM. Let me know if you need it sooner!"
-    },
-    {
-      label: "Passive-Aggressive Email",
-      original: "Per my previous email, the deadline was yesterday. I suppose you were occupied with other things.",
-      analysis: "Defensive tone (80% passive-aggressive). High emotional intensity.",
-      intent: "Blame attribution. Establishing a leverage position due to a missed deadline.",
-      reply: "Hi! Apologies for the delay on this. I'm finalizing it now and will have it in your inbox by 3 PM today. Thank you for your patience."
-    },
-    {
-      label: "Urgent Escalation",
-      original: "WE HAVE A CRISIS. The server is throwing 500 errors and users can't log in. FIX THIS NOW.",
-      analysis: "High panic (95% urgency). Polite levels are near 0%. Needs immediate triage.",
-      intent: "Emergency support demand. Critical blocker preventing core business operations.",
-      reply: "Hi team, I am investigating this immediately. I've located the server error and am deploying a hotfix now. Expected status resolution: 15 minutes."
-    }
-  ];
-
-  const [activeToneIdx, setActiveToneIdx] = useState(0);
-  const activeTone = toneDemos[activeToneIdx];
-
-  return (
-    <section id="tone-presets" style={{ padding: '80px 20px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>Tone Intelligence</SectionBadge>
-        <SectionTitle>Understand tone before you reply</SectionTitle>
-        <SectionDesc>AI reads the hidden subtext of chaotic messages and helps you draft de-escalating, professional replies instantly.</SectionDesc>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 24, marginTop: 48 }} className="tone-grid-layout">
-          <style>{`
-            @media(max-width: 768px) {
-              .tone-grid-layout {
-                grid-template-columns: 1fr !important;
-              }
-            }
-          `}</style>
-          
-          {/* Tone Selector buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {toneDemos.map((td, idx) => (
-              <button key={td.label} onClick={() => setActiveToneIdx(idx)}
-                style={{
-                  textAlign: 'left', padding: '16px', borderRadius: 12,
-                  background: activeToneIdx === idx ? 'rgba(226,62,87,0.08)' : 'rgba(255,255,255,0.02)',
-                  border: activeToneIdx === idx ? '1px solid rgba(226,62,87,0.25)' : '1px solid rgba(255,255,255,0.06)',
-                  color: activeToneIdx === idx ? 'white' : 'rgba(255,255,255,0.6)',
-                  cursor: 'pointer', transition: 'all 0.2s',
-                  display: 'flex', flexDirection: 'column', gap: 4
-                }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{td.label}</span>
-                <span style={{ fontSize: 11, color: activeToneIdx === idx ? '#ff8fa3' : 'rgba(255,255,255,0.3)' }}>Click to analyze subtext</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Tone Display Board */}
-          <div className="hover-card" style={{
-            background: 'rgba(255,255,255,0.015)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 20, padding: '28px',
-            display: 'flex', flexDirection: 'column', gap: 20,
-            position: 'relative', overflow: 'hidden'
-          }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(226, 62, 87, 0.2), transparent)' }} />
-            
-            {/* The Original Text Block */}
-            <div>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Chaotic Message Received</span>
-              <div style={{ marginTop: 8, padding: '14px 18px', borderRadius: 12, background: 'rgba(10,0,15,0.4)', border: '1px solid rgba(255,255,255,0.05)', fontSize: 14, color: 'rgba(255,255,255,0.85)', fontStyle: 'italic', lineHeight: '1.6' }}>
-                "{activeTone.original}"
-              </div>
-            </div>
-
-            {/* Split Decoded Result */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }} className="tone-inner-grid">
-              <style>{`
-                @media(max-width: 540px) {
-                  .tone-inner-grid {
-                    grid-template-columns: 1fr !important;
-                  }
-                }
-              `}</style>
-              <div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#f472b6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>◎ Pulse Tone Analysis</span>
-                <p style={{ marginTop: 6, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: '1.5' }}>{activeTone.analysis}</p>
-              </div>
-              <div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>◈ Decrypted Intent</span>
-                <p style={{ marginTop: 6, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: '1.5' }}>{activeTone.intent}</p>
-              </div>
-            </div>
-
-            {/* Recommended Reply Draft */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>◷ Suggested Reply Draft</span>
-              </div>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: '1.6', background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.15)', padding: '12px 16px', borderRadius: 10 }}>
-                {activeTone.reply}
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   BENTO GRID CORE MODULES — Ten tools. One platform.
-   ============================================================ */
-function BentoModulesSection() {
-  return (
-    <section id="modules" style={{ padding: '80px 20px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>All Modules</SectionBadge>
-        <SectionTitle>Ten tools. One workspace.</SectionTitle>
-        <SectionDesc>We run ten specialized analysis models simultaneously to inspect your text from every angle.</SectionDesc>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginTop: 48 }} className="bento-container">
-          <style>{`
-            @media(max-width: 1024px) {
-              .bento-container {
-                grid-template-columns: repeat(6, 1fr) !important;
-              }
-              .bento-col-8, .bento-col-4, .bento-col-6, .bento-col-3 {
-                grid-column: span 6 !important;
-              }
-            }
-            @media(max-width: 640px) {
-              .bento-container {
-                grid-template-columns: 1fr !important;
-              }
-              .bento-col-8, .bento-col-4, .bento-col-6, .bento-col-3 {
-                grid-column: span 1 !important;
-              }
-            }
-          `}</style>
-
-          {/* 1. BRIEF MODULE (Col span 8) */}
-          <div className="bento-card bento-col-8" style={{ gridColumn: 'span 8', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 220 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#E23E57' }}>✦</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#E23E57', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Brief</span>
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 500, color: 'white', marginBottom: 8 }}>Summarize anything in seconds</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: '1.6', maxWidth: 450 }}>
-                Condense long, verbose documents into essential takeaways. Save hours of reading without losing critical insights.
-              </p>
-            </div>
-            
-            {/* Visual simulation */}
-            <div style={{ display: 'flex', gap: 16, marginTop: 20, alignItems: 'center', background: 'rgba(10,0,15,0.4)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna...
-              </div>
-              <span style={{ color: '#E23E57', fontSize: 14 }}>➔</span>
-              <div style={{ flex: 1, fontSize: 11, color: '#ff8fa3', fontWeight: 500 }}>
-                ✓ Distilled to one actionable, core conclusion.
-              </div>
-            </div>
-          </div>
-
-          {/* 2. PULSE MODULE (Col span 4) */}
-          <div className="bento-card bento-col-4" style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#f472b6' }}>◎</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#f472b6', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pulse</span>
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 500, color: 'white', marginBottom: 8 }}>Tone & Emotion</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: '1.6' }}>
-                Uncover emotional signals such as hostility, frustration, or fear.
-              </p>
-            </div>
-
-            {/* Visual simulation: Mini bar chart */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 16 }}>
-              {[
-                { name: 'Urgency', val: 85, col: '#f472b6' },
-                { name: 'Politeness', val: 30, col: '#818cf8' }
-              ].map(em => (
-                <div key={em.name}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>{em.name}</span>
-                    <span style={{ color: em.col }}>{em.val}%</span>
-                  </div>
-                  <div style={{ height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
-                    <div style={{ height: '100%', background: em.col, width: `${em.val}%`, borderRadius: 2 }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. SIGNALS MODULE (Col span 4) */}
-          <div className="bento-card bento-col-4" style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 200 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#fbbf24' }}>⚠</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Signals</span>
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 500, color: 'white', marginBottom: 8 }}>Risk & Red Flags</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: '1.6' }}>
-                Instantly flag scam attempts, manipulation, or hidden threats.
-              </p>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', padding: '6px 10px', borderRadius: 8, marginTop: 14 }}>
-              <span style={{ fontSize: 12 }}>🚨</span>
-              <span style={{ fontSize: 11, color: '#fde68a', fontWeight: 500 }}>Suspicious Urgency Detected</span>
-            </div>
-          </div>
-
-          {/* 4. REPLY MODULE (Col span 8) */}
-          <div className="bento-card bento-col-8" style={{ gridColumn: 'span 8', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#34d399' }}>◷</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Reply</span>
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 500, color: 'white', marginBottom: 8 }}>Smart Draft suggestions</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: '1.6', maxWidth: 450 }}>
-                Get custom response recommendations optimized for tone (e.g. empathetic, firm, cooperative) to resolve conflicts and move projects forward.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 20 }} className="bento-replies-flex">
-              <div style={{ flex: 1, padding: '8px 12px', background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: 10, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#6ee7b7', marginBottom: 3 }}>FIRM REPLY</span>
-                "We require deadline adherence or project cancellation..."
-              </div>
-              <div style={{ flex: 1, padding: '8px 12px', background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.15)', borderRadius: 10, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#a5b4fc', marginBottom: 3 }}>COOPERATIVE REPLY</span>
-                "Let's sync up immediately to resolve blocker issues..."
-              </div>
-            </div>
-          </div>
-
-          {/* 5. SCORE (Col span 3) */}
-          <div className="bento-card bento-col-3" style={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 180 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#a78bfa' }}>◆</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Score</span>
-              </div>
-              <h3 style={{ fontSize: 16, fontWeight: 500, color: 'white', marginBottom: 6 }}>Metrics Score</h3>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                Grade clarity, politeness, and professional levels.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-              <div style={{ textAlign: 'center', flex: 1 }}>
-                <span style={{ fontSize: 18, fontWeight: 600, color: 'white' }}>9.2</span>
-                <span style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Clarity</span>
-              </div>
-              <div style={{ textAlign: 'center', flex: 1 }}>
-                <span style={{ fontSize: 18, fontWeight: 600, color: 'white' }}>1.5</span>
-                <span style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Risk</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 6. INTENT (Col span 3) */}
-          <div className="bento-card bento-col-3" style={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#818cf8' }}>◈</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Intent</span>
-              </div>
-              <h3 style={{ fontSize: 16, fontWeight: 500, color: 'white', marginBottom: 6 }}>Hidden Meaning</h3>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                Find the underlying message beneath the fluff.
-              </p>
-            </div>
-            <div style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', padding: '4px 8px', borderRadius: 6, fontSize: 11, color: '#a5b4fc', textAlign: 'center', marginTop: 14 }}>
-              Intent: Negotiate Price ◈
-            </div>
-          </div>
-
-          {/* 7. EXTRACT (Col span 3) */}
-          <div className="bento-card bento-col-3" style={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#22d3ee' }}>◻</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Extract</span>
-              </div>
-              <h3 style={{ fontSize: 16, fontWeight: 500, color: 'white', marginBottom: 6 }}>Tasks & Dates</h3>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                Pull action items and deadlines out automatically.
-              </p>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 14 }}>
-              <span style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(34,211,238,0.1)', color: '#67e8f9', borderRadius: 4 }}>✓ Review Draft</span>
-              <span style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(251,146,60,0.1)', color: '#fdba74', borderRadius: 4 }}>📅 Friday 2pm</span>
-            </div>
-          </div>
-
-          {/* 8. REWRITE (Col span 3) */}
-          <div className="bento-card bento-col-3" style={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 14, color: '#fb923c' }}>↺</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fb923c', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Rewrite</span>
-              </div>
-              <h3 style={{ fontSize: 16, fontWeight: 500, color: 'white', marginBottom: 6 }}>Style Redraft</h3>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: '1.5' }}>
-                Transform your draft into custom professional styles.
-              </p>
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 14, fontStyle: 'italic' }}>
-              Casual ➔ Professional
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   BUILT FOR SECTION — B2C + B2B split
-   ============================================================ */
-function BuiltForSection({ onNavigate }: { onNavigate: (p: Page) => void }) {
-  return (
-    <section style={{ padding: '80px 20px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>Built for people and teams</SectionBadge>
-        <SectionTitle>Whoever you are, we read the room.</SectionTitle>
-        <SectionDesc>Sumalyze works for individuals who handle messy communication and teams that process it at scale.</SectionDesc>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginTop: 48 }}>
-          {/* For individuals */}
-          <div style={{ background: 'rgba(255,255,255,0.013)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>For Individuals</span>
-              <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: '8px 0 6px', letterSpacing: '-0.02em' }}>Stop drowning in text.</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '20px' }}>One person, one inbox, unlimited complexity. Sumalyze handles the reading so you can focus on the thinking.</p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { icon: '🎓', label: 'Students', desc: 'Summarize papers, extract key arguments, study faster' },
-                { icon: '✍️', label: 'Creators', desc: 'Turn rough notes into polished posts and captions' },
-                { icon: '💼', label: 'Freelancers', desc: 'Understand client messages, draft better replies' },
-                { icon: '🔍', label: 'Job Seekers', desc: 'Decode job offers and recruiter messages' },
-              ].map(row => (
-                <div key={row.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{row.icon}</span>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: 'white', margin: 0 }}>{row.label}</p>
-                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', lineHeight: '16px' }}>{row.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => onNavigate('usecases')} style={{ padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500, border: '1px solid rgba(129,140,248,0.3)', background: 'rgba(129,140,248,0.08)', color: '#a5b4fc', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(129,140,248,0.15)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(129,140,248,0.08)'}>
-              See Individual Use Cases →
-            </button>
-          </div>
-
-          {/* For teams */}
-          <div style={{ background: 'rgba(255,255,255,0.013)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>For Teams</span>
-              <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: '8px 0 6px', letterSpacing: '-0.02em' }}>Process communication at scale.</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '20px' }}>Multiple inboxes, high volume, high stakes. Sumalyze helps teams move faster without missing signals.</p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { icon: '🎧', label: 'Support Teams',        desc: 'Summarize complaints, draft empathetic replies fast' },
-                { icon: '📈', label: 'Sales Teams',          desc: 'Extract buying signals and objections from prospects' },
-                { icon: '👤', label: 'HR & Recruiting',      desc: 'Summarize candidate notes into structured briefs' },
-                { icon: '🏢', label: 'Agencies & Operators', desc: 'Process client feedback without losing the thread' },
-              ].map(row => (
-                <div key={row.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{row.icon}</span>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: 'white', margin: 0 }}>{row.label}</p>
-                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', lineHeight: '16px' }}>{row.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => { onNavigate('usecases'); }} style={{ padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500, border: '1px solid rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.08)', color: '#34d399', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(52,211,153,0.15)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(52,211,153,0.08)'}>
-              See Team Use Cases →
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   MISSION SECTION — MVP Free first, supported by donations
-   ============================================================ */
-function MissionSection() {
-  return (
-    <section id="mission" style={{ padding: '80px 20px', borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(226,62,87,0.01)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>Our Philosophy</SectionBadge>
-        <SectionTitle>MVP Free first, supported by donations</SectionTitle>
-        <SectionDesc>We believe advanced text comprehension tools should be private and open. Sumalyze is a nonprofit project.</SectionDesc>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, marginTop: 48, alignItems: 'center' }} className="mission-grid-layout">
-          <style>{`
-            @media(max-width: 768px) {
-              .mission-grid-layout {
-                grid-template-columns: 1fr !important;
-              }
-            }
-          `}</style>
-          
-          {/* Left Column: Philosophical overview */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <h3 style={{ fontSize: 24, fontWeight: 500, color: 'white' }}>No paywalls. No subscription trap.</h3>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: '1.7' }}>
-              Most AI productivity tools want a monthly subscription before you can even paste your first document. We built Sumalyze on a different philosophy: it should be accessible to anyone.
-            </p>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: '1.7' }}>
-              We do not run advertisements, we do not track your search history, and we do not sell your document data. We are kept online purely through small, voluntary contributions from readers who find our workspace useful.
-            </p>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
-              {['No credit card required', 'No tracking pixels', 'Nonprofit status'].map(val => (
-                <span key={val} style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#34d399' }}>✓</span> {val}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Right Column: Ledger Transparency Card */}
-          <div className="hover-card" style={{
-            background: 'linear-gradient(145deg, rgba(226,62,87,0.1) 0%, rgba(10,0,15,0.4) 100%)',
-            border: '1px solid rgba(226,62,87,0.22)',
-            borderRadius: 20, padding: 28,
-            boxShadow: '0 16px 40px rgba(0,0,0,0.4)'
-          }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8fa3', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Project Ledgers</span>
-            <h4 style={{ fontSize: 18, fontWeight: 600, color: 'white', marginTop: 4, marginBottom: 16 }}>Hosting Cost Coverage</h4>
-            
-            {/* Cost Ledger Rows */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 16, marginBottom: 16 }}>
-              {[
-                { item: 'AI API Processing', cost: '$0.001 / query' },
-                { item: 'Server Hosting & Database', cost: '$45 / month' },
-                { item: 'SSL & Domain Maintenance', cost: '$12 / year' }
-              ].map(row => (
-                <div key={row.item} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.item}</span>
-                  <span style={{ color: 'white', fontFamily: 'monospace' }}>{row.cost}</span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-              <div>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Average Coffee Support</p>
-                <p style={{ fontSize: 20, fontWeight: 600, color: 'white' }}>$3.00 / donor</p>
-              </div>
-              <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
-                className="hover-glow"
-                style={{
-                  padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, color: 'white', textDecoration: 'none',
-                  background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
-                  boxShadow: '0 4px 14px rgba(226,62,87,0.3)', display: 'inline-flex', alignItems: 'center', gap: 6
-                }}>
-                ☕ Support on Ko-fi
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   TESTIMONIALS
-   ============================================================ */
-const TESTIMONIALS = [
-  { quote: "Sumalyze flagged a manipulation attempt in a client email I was about to ignore. The Signals module saved the entire project.", name: "Marketing Lead", role: "Agency", initials: "ML" },
-  { quote: "I use it every morning to triage my inbox. The Brief + Pulse combo alone saves me 30 minutes a day.", name: "Freelancer", role: "Independent", initials: "FR" },
-  { quote: "The fact that it's completely MVP free blew my mind. The reply suggestions are genuinely good — like having an editor on call.", name: "Support Manager", role: "SaaS", initials: "SM" },
-  { quote: "I used the Intent module to prep for a negotiation. Spotted the leverage the other party was hiding in plain sight.", name: "Founder", role: "Startup", initials: "FO" },
-  { quote: "Clean + Rewrite turned my rushed draft into something I was actually proud to send. Took 10 seconds.", name: "Content Writer", role: "Media", initials: "CW" },
-  { quote: "As someone who struggles with reading tone in texts, Pulse has genuinely changed how I communicate.", name: "Remote Worker", role: "Tech", initials: "RW" },
-];
-
-function TestimonialsSection() {
-  return (
-    <section style={{ padding: '0 20px 120px' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionBadge>Beta Feedback</SectionBadge>
-        <SectionTitle>What people say</SectionTitle>
-        <SectionDesc>Impressions from early beta users and testers during our closed preview.</SectionDesc>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginTop: 52 }} className="testimonials-masonry">
-          <style>{`
-            @media(min-width: 900px) {
-              .testimonials-masonry {
-                grid-template-columns: repeat(3, 1fr) !important;
-              }
-              .testimonials-masonry > div:nth-child(3n+2) {
-                transform: translateY(16px);
-              }
-            }
-          `}</style>
-          {TESTIMONIALS.map((t, idx) => (
-            <div key={idx} id={`testimonial-${idx}`} className="hover-card" style={{ background: 'rgba(255,255,255,0.012)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: '28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: '24px', flex: 1, fontStyle: 'italic' }}>"{t.quote}"</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(226,62,87,0.15)', border: '1px solid rgba(226,62,87,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#ff8fa3', flexShrink: 0 }}>{t.initials}</div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.8)' }}>{t.name}</p>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>{t.role}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
    FINAL CTA
    ============================================================ */
 function FinalCTA({ onNavigate }: { onNavigate: (p: Page) => void }) {
   return (
-    <section style={{ padding: '0 20px 120px', textAlign: 'center', position: 'relative' }}>
+    <section style={{ padding: '140px 20px 160px', textAlign: 'center', position: 'relative' }}>
       <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 800, height: 400, background: 'radial-gradient(ellipse, rgba(226,62,87,0.08) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 600, margin: '0 auto' }}>
-        <SectionBadge>Get Started</SectionBadge>
         <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: '1.1', letterSpacing: '-0.03em', margin: '0 0 20px' }}>
           <span style={{ background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', display: 'block' }}>
             Start understanding
@@ -1886,7 +1448,7 @@ function FinalCTA({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => onNavigate('agent')} style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: '#f4f0ff', border: '1px solid rgba(207,184,255,0.2)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)', backdropFilter: 'blur(8px)', cursor: 'pointer', fontFamily: 'inherit' }}>
-            Try Agent Mode ✧
+            Try Agent Mode
           </button>
           <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
             ♥ Support on Ko-fi
@@ -1965,8 +1527,8 @@ function Footer({ onNavigate, onFeedbackClick }: { onNavigate: (page: Page) => v
         </div>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>© {new Date().getFullYear()} Sumalyze · Nonprofit AI communication platform</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Made with ♥ for clearer communication</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>© {new Date().getFullYear()} Sumalyze · AI Clarity Workspace</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Independent AI workspace for clearer thinking.</p>
         </div>
       </div>
     </footer>
@@ -1976,18 +1538,7 @@ function Footer({ onNavigate, onFeedbackClick }: { onNavigate: (page: Page) => v
 /* ============================================================
    SHARED COMPONENTS
    ============================================================ */
-function SectionBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', margin: '0 auto 16px',
-      padding: '6px 14px', borderRadius: 32,
-      backdropFilter: 'blur(6px)', boxShadow: 'inset 0 -7px 11px rgba(226,62,87,0.08)',
-      background: 'rgba(226,62,87,0.06)', border: '1px solid rgba(226,62,87,0.2)',
-    }}>
-      <span style={{ fontSize: 13, fontWeight: 500, background: 'linear-gradient(90deg, #ff8fa3 0%, #E23E57 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{children}</span>
-    </div>
-  );
-}
+
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (

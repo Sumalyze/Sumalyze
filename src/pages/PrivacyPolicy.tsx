@@ -53,7 +53,7 @@ export default function PrivacyPolicy({ onClose }: { onClose: () => void }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
 
           <Section title="Overview">
-            <p>Sumalyze is a nonprofit AI communication intelligence workspace. We are committed to protecting your privacy. This policy explains what data we collect, why we use it, and how your data is handled.</p>
+            <p>Sumalyze is an independent AI communication intelligence workspace. We are committed to protecting your privacy. This policy explains what data we collect, why we use it, and how your data is handled.</p>
             <p>The short version: <strong style={{ color: 'white' }}>we collect as little as possible, we don't sell your data, and we do not use your submissions for training models.</strong></p>
           </Section>
 
@@ -108,7 +108,7 @@ export default function PrivacyPolicy({ onClose }: { onClose: () => void }) {
               Hosts our static assets and serverless function routes. Temporarily routes IP headers for rate-limiting verification.
             </Item>
             <Item label="Ko-fi">
-              Used for voluntary nonprofit donations. Sumalyze does not process or store payment cards; Ko-fi handles contributions directly.
+              Used for voluntary contributions to support the project. Sumalyze does not process or store payment cards; Ko-fi handles contributions directly.
             </Item>
           </Section>
 

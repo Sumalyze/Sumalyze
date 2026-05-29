@@ -90,7 +90,7 @@ export default function Nonprofit() {
             </h2>
 
             <p className="text-secondary text-lg leading-relaxed mb-4 max-w-2xl mx-auto">
-              Sumalyze is a nonprofit project. We believe AI-powered communication tools should
+              Sumalyze is an independent project. We believe AI-powered communication tools should
               be accessible to everyone — not locked behind subscriptions or enterprise paywalls.
             </p>
             <p className="text-muted text-base leading-relaxed mb-10 max-w-xl mx-auto">
