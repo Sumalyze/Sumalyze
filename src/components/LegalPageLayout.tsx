@@ -8,6 +8,8 @@ interface LegalPageLayoutProps {
 }
 
 export default function LegalPageLayout({ title, lastUpdated, intro, children }: LegalPageLayoutProps) {
+  const isMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+
   // Update document title for SEO
   useEffect(() => {
     document.title = `${title} | Sumalyze`;
@@ -29,37 +31,39 @@ export default function LegalPageLayout({ title, lastUpdated, intro, children }:
       <div style={{ maxWidth: 850, margin: '0 auto' }}>
         
         {/* Back Link */}
-        <button
-          onClick={() => {
-            window.history.pushState(null, '', '/');
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 16px',
-            borderRadius: 8,
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            color: 'rgba(255, 255, 255, 0.5)',
-            fontSize: 13,
-            cursor: 'pointer',
-            marginBottom: 32,
-            fontFamily: 'inherit',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)';
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-          }}
-        >
-          ← Back to Home
-        </button>
+        {!isMaintenance && (
+          <button
+            onClick={() => {
+              window.history.pushState(null, '', '/');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 16px',
+              borderRadius: 8,
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: 13,
+              cursor: 'pointer',
+              marginBottom: 32,
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+            }}
+          >
+            ← Back to Home
+          </button>
+        )}
 
         {/* Header */}
         <div style={{ marginBottom: 40 }}>

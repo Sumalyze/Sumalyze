@@ -1,5 +1,6 @@
 export default function Footer() {
   const year = new Date().getFullYear();
+  const isMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
   return (
     <footer className="relative pt-16 pb-10 overflow-hidden"
@@ -31,23 +32,27 @@ export default function Footer() {
           </div>
 
           {/* Nav columns */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 sm:gap-12">
-            <div>
-              <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Product</p>
-              <div className="space-y-2">
-                <a href="#features" className="nav-link block text-sm">Features</a>
-                <a href="#demo" className="nav-link block text-sm">Demo</a>
-                <a href="#use-cases" className="nav-link block text-sm">Use Cases</a>
+          <div className={`grid ${isMaintenance ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3'} gap-8 sm:gap-12`}>
+            {!isMaintenance && (
+              <div>
+                <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Product</p>
+                <div className="space-y-2">
+                  <a href="#features" className="nav-link block text-sm">Features</a>
+                  <a href="#demo" className="nav-link block text-sm">Demo</a>
+                  <a href="#use-cases" className="nav-link block text-sm">Use Cases</a>
+                </div>
               </div>
-            </div>
-            <div>
-              <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Mission</p>
-              <div className="space-y-2">
-                <a href="#mission" className="nav-link block text-sm">Mission</a>
-                <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" className="nav-link block text-sm">Ko-fi</a>
-                <a href="mailto:hello@sumalyze.com" className="nav-link block text-sm">Contact</a>
+            )}
+            {!isMaintenance && (
+              <div>
+                <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Mission</p>
+                <div className="space-y-2">
+                  <a href="#mission" className="nav-link block text-sm">Mission</a>
+                  <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" className="nav-link block text-sm">Ko-fi</a>
+                  <a href="mailto:hello@sumalyze.com" className="nav-link block text-sm">Contact</a>
+                </div>
               </div>
-            </div>
+            )}
             <div>
               <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Legal & Support</p>
               <div className="space-y-2">

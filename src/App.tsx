@@ -232,7 +232,24 @@ function AppContent() {
 
   return (
     <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-      <Header onNavigate={navigate} onNavigateTool={navigateToTool} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
+      {isMaintenanceMode ? (
+        <div style={{
+          width: '100%',
+          padding: '16px 24px',
+          background: 'rgba(226, 62, 87, 0.05)',
+          borderBottom: '1px solid rgba(226, 62, 87, 0.15)',
+          color: '#ff8fa3',
+          fontSize: 13,
+          fontWeight: 500,
+          textAlign: 'center',
+          letterSpacing: '0.02em',
+          fontFamily: 'Outfit, sans-serif'
+        }}>
+          Sumalyze · Policy & verification access under system maintenance
+        </div>
+      ) : (
+        <Header onNavigate={navigate} onNavigateTool={navigateToTool} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
+      )}
 
       {page === 'tools' && (
         <div className="page-enter">
