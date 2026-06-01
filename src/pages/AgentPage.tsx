@@ -10,6 +10,11 @@ import { useAuth } from '../hooks/useAuth';
 import { saveAgentRun, saveOutput } from '../services/database';
 import { useToast } from '../components/Toast';
 import DocumentUpload from '../components/DocumentUpload';
+import ExportDropdown from '../components/ExportDropdown';
+import { compileAgentReport } from '../lib/exportUtils';
+import { useCurrentPlan } from '../hooks/useCurrentPlan';
+import { dispatchAppNavigate } from '../utils/navigation';
+import { captureEvent } from '../lib/analytics';
 
 
 /* ─── Types ───────────────────────────────────────────────────── */
@@ -182,14 +187,17 @@ function ResultCard({ label, accent, icon, children, copyText, saveData }: {
 function AgentResultsPanel({ result }: { result: AgentResult }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Agent Analysis Complete</span>
-        {result._mock && (
-          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: '1px solid rgba(107,114,128,0.2)' }}>
-            Preview Mode
-          </span>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Agent Analysis Complete</span>
+          {result._mock && (
+            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: '1px solid rgba(107,114,128,0.2)' }}>
+              Preview Mode
+            </span>
+          )}
+        </div>
+        <ExportDropdown content={compileAgentReport(result)} toolName={`Agent_${result.goal}`} />
       </div>
 
       {/* Summary + Score row */}
@@ -288,9 +296,33 @@ function AgentResultsPanel({ result }: { result: AgentResult }) {
 
 export default function AgentPage({ onSignIn }: { onSignIn: () => void }) {
   const { user } = useAuth();
+  const { plan } = useCurrentPlan();
   const isLoggedIn = !!user;
-  const limited = isLimitReached('agent', isLoggedIn);
-  const remaining = getRemainingUses('agent', isLoggedIn);
+  const limited = isLimitReached('agent', isLoggedIn, plan);
+  const remaining = getRemainingUses('agent', isLoggedIn, plan);
+
+  // TODO: Monthly agent limit counter enforcement
+  // Starter: 3 agent runs/month, Pro: 50 runs/month, Max: 150 runs/month.
+  // Not enforced yet because monthly usage table resets are not active on backend.
+
+  useEffect(() => {
+    if (plan === 'free') {
+      captureEvent('upgrade_prompt_viewed', {
+        feature: 'agent',
+        required_plan: 'starter',
+        current_plan: 'free',
+      });
+    }
+  }, [plan]);
+
+  const handleUpgradeClick = () => {
+    captureEvent('feature_locked_clicked', {
+      feature: 'agent',
+      required_plan: 'starter',
+      current_plan: 'free',
+    });
+    dispatchAppNavigate('pricing');
+  };
 
   const [text, setText] = useState('');
   const [inputType, setInputType] = useState<'text' | 'file'>('text');
@@ -307,6 +339,43 @@ export default function AgentPage({ onSignIn }: { onSignIn: () => void }) {
   }, [isLoggedIn]);
 
   const abortRef = useRef<AbortController | null>(null);
+
+  if (plan === 'free') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0a000f', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif', paddingBottom: 120 }}>
+        {/* Hero Background */}
+        <div style={{ padding: '100px 20px 40px', background: 'radial-gradient(40% 60% at 50% 0%, rgba(226,62,87,0.08) 0%, transparent 100%)', borderBottom: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 32, background: 'rgba(226,62,87,0.07)', border: '1px solid rgba(226,62,87,0.2)', marginBottom: 20 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#E23E57', display: 'inline-block', animation: 'premiumPulse 1.5s infinite' }} />
+            <span style={{ fontSize: 13, fontWeight: 500, background: 'linear-gradient(90deg, #ff8fa3, #E23E57)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Agent Mode — Multi-step AI Analysis
+            </span>
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 550, margin: '80px auto 0', padding: '48px 36px', textAlign: 'center', background: 'rgba(14,4,22,0.97)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, boxShadow: '0 32px 64px rgba(0,0,0,0.6)', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(226,62,87,0.5), transparent)', borderRadius: '24px 24px 0 0' }} />
+          <div style={{ fontSize: 40, marginBottom: 20 }}>🔒</div>
+          <h2 style={{ fontSize: 24, fontWeight: 600, color: 'white', marginBottom: 12 }}>Agent Mode is locked</h2>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.75)', lineHeight: '22px', margin: '0 0 6px' }}>
+            This is available on Starter/Pro/Max.
+          </p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 28px' }}>
+            Upgrade when you need heavier usage.
+          </p>
+          <button onClick={handleUpgradeClick} style={{
+            padding: '12px 32px', borderRadius: 12, fontSize: 14, fontWeight: 600, border: 'none',
+            background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+            color: 'white', cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(226,62,87,0.3)', transition: 'all 0.2s',
+            fontFamily: 'inherit',
+          }}>
+            View pricing
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const SAMPLE_TEXTS = [
     { label: 'Tricky email', text: 'I wanted to follow up on the proposal I sent two weeks ago. I understand you\'re probably very busy, but our timeline is getting quite tight. I\'d hate for this opportunity to pass us both by. Could we maybe jump on a quick call this week?' },

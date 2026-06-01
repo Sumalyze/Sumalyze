@@ -2,6 +2,8 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User, Session } from '../lib/supabase';
 import { checkAndInitializeProfile } from '../services/database';
+import { identifyUser, resetAnalytics } from '../lib/analytics';
+import { mapAuthError } from '../utils/authError';
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +30,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       if (currentUser) {
         checkAndInitializeProfile(currentUser);
+        identifyUser({
+          id: currentUser.id,
+          email: currentUser.email,
+          createdAt: currentUser.created_at,
+        });
       }
       setLoading(false);
     });
@@ -39,6 +46,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       if (currentUser) {
         checkAndInitializeProfile(currentUser);
+        identifyUser({
+          id: currentUser.id,
+          email: currentUser.email,
+          createdAt: currentUser.created_at,
+        });
+      } else {
+        resetAnalytics();
       }
     });
 
@@ -46,13 +60,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error as Error | null };
+    try {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        return { error: new Error(mapAuthError(error)) };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(mapAuthError(err)) };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        return { error: new Error(mapAuthError(error)) };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(mapAuthError(err)) };
+    }
   };
 
   const signOut = async () => {
@@ -60,11 +88,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://sumalyze.space/',
-    });
-    return { error: error as Error | null };
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://sumalyze.space/',
+      });
+      if (error) {
+        return { error: new Error(mapAuthError(error)) };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(mapAuthError(err)) };
+    }
   };
+
 
   return (
     <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resetPassword }}>

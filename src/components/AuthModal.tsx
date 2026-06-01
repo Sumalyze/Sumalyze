@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import sumalyzeLogo from '../assets/sumalyzelogo.png';
+import { captureEvent } from '../lib/analytics';
+
+type Page = 'home' | 'privacy' | 'terms' | 'cookies' | 'refund' | 'billing' | 'data-deletion' | 'support' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing' | 'login' | 'signup' | 'forgot-password' | 'settings';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigate?: (p: Page) => void;
 }
 
-export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onNavigate }: AuthModalProps) {
   const { signIn, signUp, resetPassword } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
@@ -23,16 +27,25 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setError(null);
     setSuccess(null);
 
-    if (!email.trim() || !password.trim()) {
+    if (!email.trim() || (mode !== 'forgot' && !password.trim())) {
       setError('Please fill in all fields.');
       return;
     }
-    if (password.length < 6) {
+    if (mode !== 'forgot' && password.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
     }
 
     setLoading(true);
+
+    if (mode === 'login') {
+      captureEvent('login_started');
+    } else if (mode === 'signup') {
+      captureEvent('signup_started');
+    } else if (mode === 'forgot') {
+      captureEvent('forgot_password_submitted');
+    }
+
     try {
       if (mode === 'forgot') {
         const { error } = await resetPassword(email);
@@ -46,6 +59,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         if (error) {
           setError(error.message || 'Invalid email or password.');
         } else {
+          captureEvent('login_completed');
           onClose();
         }
       } else {
@@ -53,6 +67,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         if (error) {
           setError(error.message || 'Could not create account.');
         } else {
+          captureEvent('signup_completed');
           setSuccess('Check your email to confirm your account.');
         }
       }
@@ -280,9 +295,38 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </button>
         </form>
 
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginTop: 20 }}>
-          MVP Free · No credit card · Independent project
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 20 }}>
+          {onNavigate && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, fontSize: 12 }}>
+              <a
+                href="/login"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClose();
+                  onNavigate('login');
+                }}
+                style={{ color: '#ff8fa3', textDecoration: 'underline' }}
+              >
+                Log In Page
+              </a>
+              <span style={{ color: 'rgba(255,255,255,0.25)' }}>|</span>
+              <a
+                href="/signup"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClose();
+                  onNavigate('signup');
+                }}
+                style={{ color: '#ff8fa3', textDecoration: 'underline' }}
+              >
+                Create Account Page
+              </a>
+            </div>
+          )}
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', textAlign: 'center', margin: 0 }}>
+            MVP Free · No credit card · Independent project
+          </p>
+        </div>
       </div>
     </>
   );

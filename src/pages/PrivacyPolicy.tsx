@@ -1,181 +1,133 @@
-export default function PrivacyPolicy({ onClose }: { onClose: () => void }) {
+import LegalPageLayout, { LegalSection, LegalItem } from '../components/LegalPageLayout';
+
+export default function PrivacyPolicy() {
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0a000f',
-      color: 'white',
-      fontFamily: "Inter, system-ui, sans-serif",
-      padding: '100px 20px 80px',
-    }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <LegalPageLayout
+      title="Privacy Policy"
+      lastUpdated="June 1, 2026"
+      intro="Sumalyze is an AI clarity workspace hosted at https://sumalyze.space. We are committed to transparency, security, and data minimization. This Privacy Policy details what information we collect, how we use it, who we share it with, and your rights regarding your data."
+    >
+      <LegalSection title="1. Overview & Core Principles">
+        <p>
+          Sumalyze provides tools for AI text and document summarization, key points extraction, tone and intent analysis, action steps extraction, and interactive AI Agent workspace modes. We collect only the information necessary to provide, billing-enable, and secure this service. 
+        </p>
+        <p>
+          We do not sell your personal data or user-submitted content to third parties, and we do not use your inputs or outputs to train Sumalyze-owned public AI models.
+        </p>
+      </LegalSection>
 
-        {/* Back button */}
-        <button
-          onClick={onClose}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '8px 16px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.5)',
-            fontSize: 13, cursor: 'pointer', marginBottom: 48,
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
-        >
-          ← Back to Sumalyze
-        </button>
+      <LegalSection title="2. Information We Collect">
+        <p>We process several categories of information to run our services:</p>
+        
+        <LegalItem label="Account Data">
+          Your registered email address, optional name, and profile information. Authentication and passwords are handled securely by our auth partner, Supabase. If you choose to log in using Google or GitHub OAuth, we collect your basic social profile metadata (e.g. name, email, avatar URL) as permitted by those providers.
+        </LegalItem>
 
-        {/* Header */}
-        <div style={{ marginBottom: 48 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '5px 14px', borderRadius: 32,
-            background: 'rgba(226,62,87,0.06)',
-            border: '1px solid rgba(226,62,87,0.2)',
-            marginBottom: 20,
-          }}>
-            <span style={{
-              fontSize: 13, fontWeight: 500,
-              background: 'linear-gradient(90deg, #ff8fa3 0%, #E23E57 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>Legal</span>
-          </div>
-          <h1 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 16 }}>
-            Privacy Policy
-          </h1>
-          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.4)' }}>
-            Last updated: May 29, 2026
-          </p>
-        </div>
+        <LegalItem label="User Content">
+          The text snippets you submit for analysis, uploaded files and documents (which are parsed and processed transiently, and not stored permanently except for text outputs saved in your history), generated outputs (summaries, key points, action items, tone analyses, Agent run logs), and saved workspace histories.
+        </LegalItem>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+        <LegalItem label="Support & Communication Data">
+          Content of emails, feedback forms, and support requests you submit to us, including your waitlist questionnaire responses for the Team Workspace.
+        </LegalItem>
 
-          <Section title="Overview">
-            <p>Sumalyze is an independent AI communication intelligence workspace. We are committed to protecting your privacy. This policy explains what data we collect, why we use it, and how your data is handled.</p>
-            <p>The short version: <strong style={{ color: 'white' }}>we collect as little as possible, we don't sell your data, and we do not use your submissions for training models.</strong></p>
-          </Section>
+        <LegalItem label="Payment & Subscription Metadata">
+          We use Paddle as our Merchant of Record and payment processor. While your credit card and raw payment credentials are processed directly by Paddle, we receive and store subscription state metadata, transaction IDs, subscription renew/cancel timestamps, and billing plans (Free, Starter, Pro, Max). We do not store full credit card numbers on our servers.
+        </LegalItem>
 
-          <Section title="What We Collect & Process">
-            <Item label="Submitted Text content">
-              Text you paste for analysis is processed in-flight using secure serverless Netlify functions. For guest users, this text is processed transiently and is never stored on our database. For signed-in users, the text and its analysis results are saved in your account history only if you run the tools or save them.
-            </Item>
-            <Item label="Account & Auth data">
-              If you sign up for an account, we store your email address and authentication credentials securely via Supabase. We do not store plain-text passwords.
-            </Item>
-            <Item label="Saved history & Bookmarks">
-              If you are logged in, we store your single tools history, agent step logs (such as goal stepper progress), and saved bookmarks (clarity reports and reply drafts) in your Supabase database profile so you can manage them.
-            </Item>
-            <Item label="Usage & Anti-abuse logs">
-              To enforce usage limits (50 daily runs for tools, 10 for agent mode) and prevent spam attacks, we track usage counters. For guest users, we process and temporarily check incoming IP addresses in-memory server-side to enforce our rate limit (5 requests per 60 seconds). Guest IP logs are regularly pruned and are not permanently saved.
-            </Item>
-            <Item label="Feedback submissions">
-              If you submit feedback, suggestions, or bug reports via our Feedback modal, we save the category (bug/suggestion/other), message rating (1-5), and feedback content. If you are signed in, your user ID is attached to the feedback; if you are logged out, submissions are saved anonymously.
-            </Item>
-          </Section>
+        <LegalItem label="Technical, Security, & Usage Data">
+          To prevent abuse, secure the platform, and monitor usage limits, we record: IP addresses, rate-limiting counters, browser/device metadata (operating system, browser version), and overall feature usage counters.
+        </LegalItem>
+      </LegalSection>
 
-          <Section title="Why We Use Your Data">
-            <p>We process and store data strictly for the following purposes:</p>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              {[
-                'To provide AI text analysis, summaries, and reply recommendations',
-                'To let you save, review, and delete your history and bookmarked outputs',
-                'To enforce fair-use usage limits and guest rate-limiting boundaries',
-                'To process your bugs, feature suggestions, or ratings to improve the platform',
-                'To ensure the security, integrity, and stability of our serverless APIs',
-              ].map(item => (
-                <li key={item} style={{ display: 'flex', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
-                  <span style={{ color: '#34d399', flexShrink: 0 }}>✓</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
+      <LegalSection title="3. AI Processing & Third-Party AI Providers">
+        <p>
+          To generate summaries, extract key points, analyze tone, and run the Agent Mode, the text you submit and files you upload are transmitted in real-time to our primary AI provider, Google Gemini, or our fallback provider, OpenRouter.
+        </p>
+        <p>
+          These providers process your content through professional API endpoints designed to protect confidentiality. Under our terms with these providers, submitted text is not used to train public models. However, users should avoid submitting highly sensitive, proprietary, or regulated personal data unless necessary for their workspace needs.
+        </p>
+      </LegalSection>
 
-          <Section title="Third-Party Processors">
-            <p>To power Sumalyze, we share in-flight text content or use services hosted by these trusted providers:</p>
-            <Item label="Google AI (Gemini)">
-              Our primary AI provider. In-flight text is sent to Google's Gemini models for processing. Under their terms, API data is not used to train Google's models.
-            </Item>
-            <Item label="OpenRouter">
-              Used as our backup fallback AI processor. In-flight text is processed in accordance with their privacy policies.
-            </Item>
-            <Item label="Supabase">
-              Handles user authentication, session state management, usage limit data, history tables, and user feedback records.
-            </Item>
-            <Item label="Netlify">
-              Hosts our static assets and serverless function routes. Temporarily routes IP headers for rate-limiting verification.
-            </Item>
-            <Item label="Ko-fi">
-              Used for voluntary contributions to support the project. Sumalyze does not process or store payment cards; Ko-fi handles contributions directly.
-            </Item>
-          </Section>
+      <LegalSection title="4. Cookies & Local Storage">
+        <p>
+          We use cookies and browser local storage to operate and optimize the application:
+        </p>
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0 0 16px', listStyleType: 'disc' }}>
+          <li><strong>Authentication:</strong> Supabase session identifiers to maintain your logged-in state.</li>
+          <li><strong>Preferences:</strong> Saving user interface layout settings, toggle states, and theme choices.</li>
+          <li><strong>Application Status:</strong> Tracking cookie consent preferences and waitlist sign-up status.</li>
+          <li><strong>Analytics:</strong> PostHog anonymous tracking cookies, which are strictly initialized only if you grant analytics consent.</li>
+        </ul>
+      </LegalSection>
 
-          <Section title="Your Rights & Control">
-            <p>You have complete control over your data on Sumalyze:</p>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              {[
-                'You can view and delete individual logs from your History dashboard at any time',
-                'You can delete saved replies and clarity bookmarks whenever you want',
-                'You can request complete deletion of your account and all records by contacting hello@sumalyze.space',
-              ].map(item => (
-                <li key={item} style={{ display: 'flex', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
-                  <span style={{ color: '#818cf8', flexShrink: 0 }}>→</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
+      <LegalSection title="5. Third-Party Data Processors & Sub-processors">
+        <p>
+          We share data with the following partners only to the extent required to execute our contract with you or maintain legitimate interests:
+        </p>
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+          {[
+            { label: 'Supabase', desc: 'Provides our secure cloud database, authentication, and storage where enabled.' },
+            { label: 'Google Gemini', desc: 'Acts as our primary generative AI engine for analyzing inputs and creating outputs.' },
+            { label: 'OpenRouter', desc: 'Serves as our secondary/fallback AI gateway provider.' },
+            { label: 'Paddle', desc: 'Our payment processor and Merchant of Record. Handles all checkouts, subscriptions, renewals, taxes, and invoices.' },
+            { label: 'PostHog', desc: 'Collects privacy-safe telemetry and usage metrics. No raw user content, uploaded documents, generated outputs, or full email addresses are sent to PostHog.' },
+            { label: 'Resend', desc: 'Sends transactional alerts, account notifications, and Waitlist support emails.' },
+            { label: 'Zoho & ImprovMX', desc: 'Manages incoming business emails, forwarding, and support communication routing.' },
+            { label: 'Cloudflare Turnstile', desc: 'Provides anti-spam verification and bot protection on our forms.' },
+            { label: 'Upstash Redis', desc: 'Enforces API rate limiting and provides key-value caching to prevent platform abuse.' },
+            { label: 'Ko-fi', desc: 'Allows optional user donations and support. If you connect your support payment, it may grant limited promotional Pro access.' }
+          ].map((item, idx) => (
+            <li key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 14 }}>
+              <span style={{ fontWeight: 600, color: 'rgba(255, 255, 255, 0.85)' }}>{item.label}</span>
+              <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>{item.desc}</span>
+            </li>
+          ))}
+        </ul>
+      </LegalSection>
 
-          <Section title="AI Disclaimer & Security">
-            <p>We use industry-standard HTTPS transfer protocols and secure database access layers to protect your account. However, please note that AI outputs are generated by machine models and may contain inaccuracies. Users should review and verify critical, legal, or financial analyses independently.</p>
-          </Section>
+      <LegalSection title="6. Legal Basis for Processing">
+        <p>If you reside in the European Economic Area (EEA) or United Kingdom, we process your personal data under the following legal bases:</p>
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0 0 16px', listStyleType: 'disc' }}>
+          <li><strong>Performance of Contract:</strong> To set up your account, process payments, and provide the summarization/Agent services.</li>
+          <li><strong>Legitimate Interests:</strong> To secure the platform against fraud or DDoS attacks, rate-limit access, and maintain application stability.</li>
+          <li><strong>Consent:</strong> For setting optional preferences and executing anonymous analytics (PostHog tracking). You can withdraw this consent at any time.</li>
+          <li><strong>Legal Obligation:</strong> To maintain accounting records and tax compliance required by our payment processors and applicable tax, billing, and legal obligations.</li>
+        </ul>
+      </LegalSection>
 
-          <Section title="Changes to This Policy">
-            <p>We may update this policy occasionally as we refine the MVP. We will post updates on this page and date the top of the policy accordingly.</p>
-          </Section>
+      <LegalSection title="7. Data Retention & International Processing">
+        <p>
+          We retain your account profile, saved history, saved outputs, and related workspace data for as long as your account remains active. If you delete items from your history dashboard, they are permanently expunged from our active database layers (backups may persist for up to 30 days for disaster recovery). 
+        </p>
+        <p>
+          Sumalyze operates globally. Your data will be transferred to and processed in the United States and other regions where our sub-processors (like Supabase, Google, and Paddle) maintain servers. These transfers are secured under standard contractual clauses and data processing agreements.
+        </p>
+      </LegalSection>
 
-          <Section title="Contact">
-            <p>
-              Questions? Email us at{' '}
-              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>
-            </p>
-          </Section>
+      <LegalSection title="8. Children's Privacy">
+        <p>
+          Sumalyze is not directed to children under the age of 13. If you are under the digital consent age in your country, you must only use our workspace with the explicit consent and supervision of a parent or legal guardian.
+        </p>
+      </LegalSection>
 
-        </div>
-      </div>
-    </div>
-  );
-}
+      <LegalSection title="9. Your Rights & Security Measures">
+        <p>
+          You have the right to access, correct, delete, or export your account profile and workspace history. You can restrict or object to certain processing activities, and withdraw any consent you have previously given. 
+        </p>
+        <p>
+          To protect your data, we enforce secure HTTPS transit encryption, database-level row-level security (RLS) policies in Supabase, and rate-limiting blocks. While we employ professional-grade safeguards, no cloud service is 100% secure, and we cannot guarantee absolute security.
+        </p>
+      </LegalSection>
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.018)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 16, padding: '28px 28px',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-        background: 'linear-gradient(90deg, transparent, rgba(226,62,87,0.2), transparent)',
-      }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, color: 'white', letterSpacing: '-0.01em', marginBottom: 16 }}>
-        {title}
-      </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: '22px' }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Item({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{label}</p>
-      <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', lineHeight: '22px' }}>{children}</p>
-    </div>
+      <LegalSection title="10. Data Deletion Requests & Contact">
+        <p>
+          To delete your account and remove all personal information, please visit our <a href="/data-deletion" style={{ color: '#ff8fa3', textDecoration: 'underline' }}>Data Deletion Page</a> or email us at <a href="mailto:privacy@sumalyze.space" style={{ color: '#ff8fa3', textDecoration: 'underline' }}>privacy@sumalyze.space</a>.
+        </p>
+        <p>
+          For general security and policy inquiries, contact us at <a href="mailto:support@sumalyze.space" style={{ color: '#ff8fa3', textDecoration: 'underline' }}>support@sumalyze.space</a>.
+        </p>
+      </LegalSection>
+    </LegalPageLayout>
   );
 }

@@ -1,163 +1,113 @@
-export default function TermsOfService({ onClose }: { onClose: () => void }) {
+import LegalPageLayout, { LegalSection } from '../components/LegalPageLayout';
+
+export default function TermsOfService() {
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0a000f',
-      color: 'white',
-      fontFamily: "Inter, system-ui, sans-serif",
-      padding: '100px 20px 80px',
-    }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <LegalPageLayout
+      title="Terms of Service"
+      lastUpdated="June 1, 2026"
+      intro="These Terms of Service govern your access to and use of Sumalyze (located at https://sumalyze.space), including our tools, workspaces, exports, and documentation. By accessing or using the platform, you agree to be bound by these terms."
+    >
+      <LegalSection title="1. Acceptance of Terms & Account Security">
+        <p>
+          By creating an account, pasting text, uploading documents, or subscribing to our plans, you represent that you are at least the age of digital consent in your jurisdiction and agree to comply with these Terms. 
+        </p>
+        <p>
+          You are responsible for safeguarding the credentials you use to access the platform. You must immediately notify us at <a href="mailto:support@sumalyze.space" style={{ color: '#ff8fa3', textDecoration: 'underline' }}>support@sumalyze.space</a> if you suspect any security breach or unauthorized usage of your account.
+        </p>
+      </LegalSection>
 
-        {/* Back button */}
-        <button
-          onClick={onClose}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '8px 16px', borderRadius: 8,
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.5)',
-            fontSize: 13, cursor: 'pointer', marginBottom: 48,
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
-        >
-          ← Back to Sumalyze
-        </button>
+      <LegalSection title="2. Description of Service & User Content">
+        <p>
+          Sumalyze provides an AI communication intelligence workspace offering document parsing, text summarization, key points extraction, tone analysis, action steps extraction, saved history, multi-format exports (Copy, TXT, Markdown, PDF, DOCX), and interactive Agent Mode.
+        </p>
+        <p>
+          <strong>Ownership:</strong> You retain full ownership and intellectual property rights in the text, files, and documents you upload or submit to Sumalyze ("User Content"). 
+        </p>
+        <p>
+          <strong>License to Sumalyze:</strong> You grant us a limited, non-exclusive, worldwide, royalty-free license to host, parse, and transmit your User Content solely to the extent necessary to provide the service (which includes sending inputs securely to our designated AI API processors, such as Google Gemini and OpenRouter).
+        </p>
+      </LegalSection>
 
-        {/* Header */}
-        <div style={{ marginBottom: 48 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '5px 14px', borderRadius: 32,
-            background: 'rgba(226,62,87,0.06)',
-            border: '1px solid rgba(226,62,87,0.2)',
-            marginBottom: 20,
-          }}>
-            <span style={{
-              fontSize: 13, fontWeight: 500,
-              background: 'linear-gradient(90deg, #ff8fa3 0%, #E23E57 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>Legal</span>
-          </div>
-          <h1 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 500, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 16 }}>
-            Terms of Service
-          </h1>
-          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.4)' }}>
-            Last updated: May 29, 2026
-          </p>
-        </div>
+      <LegalSection title="3. Acceptable Use & Prohibited Activities">
+        <p>You agree to use Sumalyze in accordance with all local, national, and international laws. Specifically, you agree not to:</p>
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          {[
+            'Use the platform for any illegal purpose, or to upload, process, or distribute unlawful or rights-infringing content.',
+            'Attempt to scrape, crawl, index, or programmatically extract data or user outputs from the service.',
+            'Abuse, bypass, or overload rate limiters, security parameters, or API routers (including executing concurrent automated requests to bypass plan quotas).',
+            'Reverse-engineer, decompile, or attempt to extract the source code or proprietary pipelines of the platform.',
+            'Transmit viruses, malware, trojan horses, or upload documents containing corrupted files or malicious payloads.',
+            'Use the outputs generated by the AI to create deceptive, malicious, or harmful material, or to represent AI-generated text as fully human-authored where disclosure is ethically or legally required.',
+            'Violate the terms of service of our sub-processors, payment providers, or hosting hosts.'
+          ].map((item, idx) => (
+            <li key={idx} style={{ display: 'flex', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
+              <span style={{ color: '#E23E57', flexShrink: 0 }}>✕</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </LegalSection>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+      <LegalSection title="4. Subscription Plans, Billing, & Paddle Checkout">
+        <p>
+          Sumalyze offers several plans: Free, Starter, Pro, and Max. Detailed limits (including daily/monthly run quotas, file size boundaries, and export availability) are specified on our pricing page. 
+        </p>
+        <p>
+          <strong>No Unlimited Usage:</strong> We do not offer unlimited API requests or processing. All paid and free tiers are subject to rate limits and fair use counters. Exceeding your plan’s limits requires upgrading or waiting for the period to reset.
+        </p>
+        <p>
+          <strong>Paddle Merchant of Record:</strong> All subscription payments, card authorizations, invoices, billing operations, and local tax processing are handled by our Merchant of Record, Paddle. By purchasing a subscription, you authorize recurring charges to your payment method.
+        </p>
+        <p>
+          <strong>Cancellation & Renewals:</strong> Your subscription will automatically renew at the end of each billing cycle (monthly or annual). You can cancel your subscription at any time through your account settings billing portal when available, or by contacting billing support.
+        </p>
+        <p>
+          <strong>Team Workspace:</strong> Access to our Team Workspace is currently waitlist-only and requires manual review and onboarding. Registering on the waitlist does not guarantee approval or access.
+        </p>
+        <p>
+          <strong>Ko-fi Support:</strong> Optional financial support via Ko-fi is a voluntary donation. While we may grant promotional Pro access for a limited time (e.g. 7 days) as a thank-you, Ko-fi donations are not regular subscriptions and do not guarantee permanent paid features.
+        </p>
+      </LegalSection>
 
-          <Section title="About Sumalyze">
-            <p>
-              Sumalyze is an independent AI communication intelligence platform. By using Sumalyze (either as a guest or as a registered account holder), you agree to these terms. If you do not agree, please do not use the workspace.
-            </p>
-          </Section>
+      <LegalSection title="5. AI Disclaimer & Limitation of Warranties">
+        <p>
+          Sumalyze uses advanced generative AI API integrations to process text. You acknowledge and agree that:
+        </p>
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '8px 0 0 16px', listStyleType: 'disc' }}>
+          <li>AI models can generate output that is incorrect, incomplete, biased, or misleading.</li>
+          <li>Outputs are provided for informational, organization, and draft-generation purposes only. They do not constitute professional, legal, financial, audit, medical, or regulatory compliance advice.</li>
+          <li>You are solely responsible for reviewing and validating the accuracy, legality, and suitability of all AI-generated outputs before relying on them.</li>
+          <li>The service is provided on an "as is" and "as available" basis, without warranties of any kind.</li>
+        </ul>
+      </LegalSection>
 
-          <Section title="The Service & Usage Limits">
-            <p>Sumalyze provides AI-powered text analysis tools including summarization, tone detection, intent analysis, risk spotting, and agent-driven clarity workflows. The service is provided free of charge during our MVP stage.</p>
-            <p>To ensure fair access and prevent abuse, we enforce usage limit tiers (such as 50 daily single tool runs and 10 agent mode runs for registered accounts). Guest interactions are subject to an in-memory IP rate limiter (5 requests per 60 seconds). Bypassing, scraping, or programmatic loading of these endpoints is strictly prohibited.</p>
-          </Section>
+      <LegalSection title="6. Limitation of Liability">
+        <p>
+          To the maximum extent permitted by applicable law, Sumalyze, its operators, affiliates, and sub-processors shall not be liable for any indirect, incidental, special, consequential, or punitive damages. This includes, but is not limited to, loss of profits, data corruption, business interruption, or any damages arising from your reliance on AI-generated outputs or system downtime.
+        </p>
+        <p>
+          In no event shall our total aggregate liability for any claims under these Terms exceed the total amount paid by you to Sumalyze in the three (3) months immediately preceding the event giving rise to the claim.
+        </p>
+      </LegalSection>
 
-          <Section title="Acceptable Use">
-            <p>You agree not to use Sumalyze to:</p>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              {[
-                'Analyze or process text that contains illegal, harmful, or abusive materials',
-                'Attempt to reverse-engineer, scan, scrape, or flood our serverless API routes',
-                'Submit private personal communications of others without their explicit consent',
-                'Violate any local, national, or international laws or regulations',
-              ].map(item => (
-                <li key={item} style={{ display: 'flex', gap: 10, fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
-                  <span style={{ color: '#E23E57', flexShrink: 0 }}>✕</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
+      <LegalSection title="7. Suspension & Termination">
+        <p>
+          We reserve the right to suspend, disable, or terminate your workspace access or account immediately, without prior notice or liability, if we determine in our sole discretion that you have violated these Terms, bypassed API limits, engaged in abuse, or failed to pay subscription dues.
+        </p>
+      </LegalSection>
 
-          <Section title="Your Content & Data Ownership">
-            <p>
-              Text you submit for analysis is yours. We do not claim ownership of your inputs. Submitted text is processed by our backend Netlify functions and sent to third-party AI APIs (Google Gemini or OpenRouter fallback) in-flight.
-            </p>
-            <p>
-              Signed-in users may save their text and analysis outcomes to their account history tables. Feedback submissions (bug reports, suggestion texts, ratings) are saved in our database. Guest users' text is processed transiently and is never stored.
-            </p>
-          </Section>
+      <LegalSection title="8. Modifications to Service & Terms">
+        <p>
+          We continually update and refine Sumalyze. We reserve the right to add, modify, or discontinue features, plan limits, or subscription pricing at any time. If we make material changes to these Terms of Service, we will notify you by updating the "Last updated" date of this document or via email.
+        </p>
+      </LegalSection>
 
-          <Section title="No Warranty / Professional Disclaimer">
-            <p>
-              Sumalyze is provided <strong style={{ color: 'white' }}>"as is"</strong> without warranties of any kind. AI outputs can be inaccurate, incomplete, or wrong. Sumalyze does NOT provide professional, legal, medical, or financial advice. You are solely responsible for how you interpret and use the AI analysis and reply recommendations.
-            </p>
-          </Section>
-
-          <Section title="Limitation of Liability">
-            <p>
-              To the fullest extent permitted by law, Sumalyze and its operators shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service. Our total liability to you shall not exceed the amount you paid us (which is $0 for all free tiers).
-            </p>
-          </Section>
-
-          <Section title="Accounts">
-            <p>
-              If you create an account, you are responsible for maintaining the confidentiality of your credentials. We reserve the right to suspend or terminate accounts that violate these terms or trigger excessive system load.
-            </p>
-          </Section>
-
-          <Section title="Donations via Ko-fi">
-            <p>
-              Support contributions via Ko-fi are completely voluntary. Contributions do not entitle you to any specific Service Level Agreements, features, or refunds.
-            </p>
-          </Section>
-
-          <Section title="Changes to Terms">
-            <p>
-              We may update these terms from time to time. Continued use of the workspace after changes are posted constitutes acceptance of the new terms.
-            </p>
-          </Section>
-
-          <Section title="Governing Law">
-            <p>
-              These terms are governed by applicable law. Any disputes shall be resolved through good-faith negotiation. Contact us first at{' '}
-              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>.
-            </p>
-          </Section>
-
-          <Section title="Contact">
-            <p>
-              Questions about these terms? Email{' '}
-              <a href="mailto:hello@sumalyze.space" style={{ color: '#ff8fa3' }}>hello@sumalyze.space</a>
-            </p>
-          </Section>
-
-        </div>
-      </div>
-    </div>
+      <LegalSection title="9. Contact & Support">
+        <p>
+          If you have any questions, disputes, or complaints regarding these Terms, please contact support at{' '}
+          <a href="mailto:support@sumalyze.space" style={{ color: '#ff8fa3', textDecoration: 'underline' }}>support@sumalyze.space</a>.
+        </p>
+      </LegalSection>
+    </LegalPageLayout>
   );
 }
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.018)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: 16, padding: '28px 28px',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-        background: 'linear-gradient(90deg, transparent, rgba(226,62,87,0.2), transparent)',
-      }} />
-      <h2 style={{ fontSize: 18, fontWeight: 600, color: 'white', letterSpacing: '-0.01em', marginBottom: 16 }}>
-        {title}
-      </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: '22px' }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-

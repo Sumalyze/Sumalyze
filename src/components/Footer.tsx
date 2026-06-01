@@ -49,10 +49,16 @@ export default function Footer() {
               </div>
             </div>
             <div>
-              <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Legal</p>
+              <p className="text-white/30 text-xs uppercase tracking-widest font-semibold mb-3">Legal & Support</p>
               <div className="space-y-2">
-                <a href="#" className="nav-link block text-sm">Privacy</a>
-                <a href="#" className="nav-link block text-sm">Terms</a>
+                <a href="/privacy" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/privacy'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Privacy Policy</a>
+                <a href="/terms" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/terms'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Terms of Service</a>
+                <a href="/cookies" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/cookies'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Cookie Policy</a>
+                <a href="/refund" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/refund'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Refund Policy</a>
+                <a href="/billing" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/billing'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Billing Terms</a>
+                <a href="/data-deletion" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/data-deletion'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Data Deletion</a>
+                <a href="/support" onClick={(e) => { e.preventDefault(); window.history.pushState(null, '', '/support'); window.dispatchEvent(new PopStateEvent('popstate')); }} className="nav-link block text-sm">Support</a>
+                <button onClick={() => window.dispatchEvent(new CustomEvent('sumalyze-open-cookie-settings'))} className="nav-link block text-sm text-left w-full" style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer' }}>Cookie settings</button>
               </div>
             </div>
           </div>

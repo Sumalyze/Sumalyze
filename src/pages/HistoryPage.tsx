@@ -11,11 +11,14 @@ import {
 import type { AnalysisHistoryRow, AgentRunRow, SavedOutputRow } from '../types';
 import { useToast } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
+import { useCurrentPlan } from '../hooks/useCurrentPlan';
+import { getHistoryLimit } from '../lib/plans';
 
 type HistoryTab = 'tools' | 'agents' | 'saved';
 
 export default function HistoryPage() {
   const { user } = useAuth();
+  const { plan } = useCurrentPlan();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<HistoryTab>('tools');
   const [loading, setLoading] = useState(true);
@@ -118,6 +121,12 @@ export default function HistoryPage() {
   const agentsItem = modalType === 'agents' && selectedItem ? selectedItem as AgentRunRow : null;
   const savedItem = modalType === 'saved' && selectedItem ? selectedItem as SavedOutputRow : null;
 
+  // TODO: Add backend-side automatic cleanup/retention script to match history count limits
+  const limit = getHistoryLimit(plan);
+  const displayedTools = toolsHistory.slice(0, limit);
+  const displayedAgents = agentRuns.slice(0, limit);
+  const displayedSaved = savedOutputs.slice(0, limit);
+
   return (
     <div style={{ padding: '120px 20px 80px', maxWidth: 1000, margin: '0 auto' }}>
       {/* Title */}
@@ -177,11 +186,11 @@ export default function HistoryPage() {
         <div>
           {/* ─── TOOLS HISTORY ─── */}
           {activeTab === 'tools' && (
-            toolsHistory.length === 0 ? (
+            displayedTools.length === 0 ? (
               <EmptyState message="No tool history found. Paste text in 'Tools' to start analyzing." />
             ) : (
               <div style={{ display: 'grid', gap: 16 }}>
-                {toolsHistory.map(item => (
+                {displayedTools.map(item => (
                   <HistoryCard
                     key={item.id}
                     title={item.analysis_type.charAt(0).toUpperCase() + item.analysis_type.slice(1).replace('_', ' ')}
@@ -197,11 +206,11 @@ export default function HistoryPage() {
 
           {/* ─── AGENT RUNS ─── */}
           {activeTab === 'agents' && (
-            agentRuns.length === 0 ? (
+            displayedAgents.length === 0 ? (
               <EmptyState message="No agent runs found. Run 'Agent Mode' to perform complete analyses." />
             ) : (
               <div style={{ display: 'grid', gap: 16 }}>
-                {agentRuns.map(item => (
+                {displayedAgents.map(item => (
                   <HistoryCard
                     key={item.id}
                     title={`Goal: ${item.goal.charAt(0).toUpperCase() + item.goal.slice(1).replace('_', ' ')}`}
@@ -218,11 +227,11 @@ export default function HistoryPage() {
 
           {/* ─── SAVED BOOKMARKS ─── */}
           {activeTab === 'saved' && (
-            savedOutputs.length === 0 ? (
+            displayedSaved.length === 0 ? (
               <EmptyState message="No bookmarks saved. Click 'Save Output' on results cards to bookmark them." />
             ) : (
               <div style={{ display: 'grid', gap: 16 }}>
-                {savedOutputs.map(item => (
+                {displayedSaved.map(item => (
                   <HistoryCard
                     key={item.id}
                     title={item.title}

@@ -2,9 +2,12 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Loader2, X } from 'lucide-react';
 import { parseFile } from '../utils/fileParser';
+import { useCurrentPlan } from '../hooks/useCurrentPlan';
+import { getFileUploadLimitMB } from '../lib/plans';
+import { captureEvent } from '../lib/analytics';
 
 interface DocumentUploadProps {
-  onTextExtracted: (text: string, fileName: string) => void;
+  onTextExtracted: (text: string, fileName: string, file?: File) => void;
   onError: (error: string | null) => void;
   accentColor?: string;
 }
@@ -14,22 +17,35 @@ export default function DocumentUpload({
   onError,
   accentColor = '#E23E57',
 }: DocumentUploadProps) {
+  const { plan } = useCurrentPlan();
   const [isDragging, setIsDragging] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [parsedFile, setParsedFile] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (file: File) => {
-    setParsing(true);
     onError(null);
     setParsedFile(null);
+
+    const limitMB = getFileUploadLimitMB(plan);
+    if (file.size > limitMB * 1024 * 1024) {
+      onError(`File is too large (${(file.size / (1024 * 1024)).toFixed(2)} MB). Your plan limit is ${limitMB} MB. Please upgrade to upload larger files.`);
+      captureEvent('feature_locked_clicked', {
+        feature: 'file_upload',
+        required_plan: limitMB === 2 ? 'starter' : limitMB === 10 ? 'pro' : limitMB === 25 ? 'max' : 'team',
+        current_plan: plan,
+      });
+      return;
+    }
+
+    setParsing(true);
     try {
       const res = await parseFile(file);
       if (res.error) {
         onError(res.error);
       } else {
         setParsedFile(file.name);
-        onTextExtracted(res.text, file.name);
+        onTextExtracted(res.text, file.name, file);
       }
     } catch (err: any) {
       onError(err.message || 'Failed to extract text from document.');
@@ -141,7 +157,7 @@ export default function DocumentUpload({
             Drop file here or <span style={{ color: accentColor, fontWeight: 500 }}>browse</span>
           </p>
           <p style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.3)', margin: 0, textAlign: 'center' }}>
-            Supports PDF, DOCX, TXT · Max 5MB
+            Supports PDF, DOCX, TXT · Max {getFileUploadLimitMB(plan)}MB
           </p>
         </>
       )}

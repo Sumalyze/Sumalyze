@@ -1,138 +1,202 @@
 // src/pages/PricingPage.tsx
-import { useState } from 'react';
-import { Check, Sparkles, Heart, Users, MessageSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, X, MessageSquare } from 'lucide-react';
+import { PLANS, TEAM_PLAN, Plan } from '../lib/plans';
+import { useAuth } from '../hooks/useAuth';
+import { captureEvent } from '../lib/analytics';
+import { useToast } from '../components/Toast';
 
-export default function PricingPage() {
+type Page = 'home' | 'privacy' | 'terms' | 'cookies' | 'refund' | 'billing' | 'data-deletion' | 'support' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing' | 'login' | 'signup' | 'forgot-password' | 'settings' | 'team-workspace';
+
+interface PricingPageProps {
+  onNavigate: (p: Page) => void;
+}
+
+const PLAN_FEATURES: Record<string, { included: string[]; excluded: string[] }> = {
+  free: {
+    included: [
+      '3 analyses/day limit',
+      'Core tools access',
+      'Last 5 history items',
+      'File upload max 2 MB',
+      'Exports: Copy, TXT, Markdown'
+    ],
+    excluded: [
+      'No Agent Mode access',
+      'No PDF export',
+      'No DOCX export',
+      'No priority processing queue',
+      'No Team Workspace access'
+    ]
+  },
+  starter: {
+    included: [
+      '100 analyses/month',
+      'Max 10 analyses/day',
+      '3 Agent Mode runs/month',
+      'File upload max 10 MB',
+      '50 analyses history logs',
+      'PDF basic export',
+      '3-day free trial'
+    ],
+    excluded: [
+      'DOCX export not included',
+      'No priority processing queue',
+      'No Team Workspace access'
+    ]
+  },
+  pro: {
+    included: [
+      '500 analyses/month',
+      'Max 30 analyses/day',
+      '50 Agent Mode runs/month',
+      'File upload max 25 MB',
+      '200 analyses history logs',
+      'PDF + DOCX export',
+      'Priority processing queue',
+      'Supporter 7 days Pro access'
+    ],
+    excluded: [
+      'No Team Workspace access',
+      'Max usage limits not included'
+    ]
+  },
+  max: {
+    included: [
+      '1500 analyses/month',
+      'Max 80 analyses/day',
+      '150 Agent Mode runs/month',
+      'File upload max 50 MB',
+      '500 analyses history logs',
+      'All exports included',
+      'Priority email support',
+      '3-day free trial'
+    ],
+    excluded: [
+      'No Team Workspace seats',
+      'Custom team onboarding not included'
+    ]
+  }
+};
+
+export default function PricingPage({ onNavigate }: PricingPageProps) {
+  const { user } = useAuth();
+  const toast = useToast();
+  
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annually'>('annually');
-  const [waitlistEmail, setWaitlistEmail] = useState('');
-  const [waitlistPlan, setWaitlistPlan] = useState('');
-  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+  
+  // Upgrade Modal State
+  const [selectedPlanForUpgrade, setSelectedPlanForUpgrade] = useState<Plan | null>(null);
+  const [notifyEmail, setNotifyEmail] = useState<string>('');
+  const [notifySuccess, setNotifySuccess] = useState<boolean>(false);
+  const [notifyLoading, setNotifyLoading] = useState<boolean>(false);
 
-  const handleWaitlistSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (waitlistEmail.trim()) {
-      setWaitlistSubmitted(true);
-      setTimeout(() => {
-        setWaitlistSubmitted(false);
-        setWaitlistEmail('');
-        setWaitlistPlan('');
-      }, 5000);
+  useEffect(() => {
+    document.title = 'Pricing Plans | Sumalyze';
+    return () => {
+      document.title = 'Sumalyze';
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user && user.email) {
+      setNotifyEmail(user.email);
+    }
+  }, [user]);
+
+  const handlePaidCtaClick = (plan: Plan) => {
+    // 1. Track upgrade clicked event securely
+    captureEvent('upgrade_clicked', {
+      plan: plan.name,
+      billing_interval: billingPeriod
+    });
+
+    if (!user) {
+      // Logged out: redirect to signup
+      toast.info(`Please sign up to configure your ${plan.name} access.`);
+      onNavigate('signup');
+    } else {
+      // Logged in: show info modal
+      setSelectedPlanForUpgrade(plan);
+      setNotifySuccess(false);
     }
   };
 
-  const getPrice = (monthly: number, annualMonthly: number) => {
-    return billingPeriod === 'annually' ? annualMonthly : monthly;
+  const handleNotifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifyEmail.trim()) return;
+
+    setNotifyLoading(true);
+    // Track interest event in PostHog securely
+    captureEvent('upgrade_interest_registered', {
+      plan: selectedPlanForUpgrade?.name,
+      billing_interval: billingPeriod
+    });
+
+    setTimeout(() => {
+      setNotifyLoading(false);
+      setNotifySuccess(true);
+      toast.success("Interest registered! We'll notify you soon.");
+    }, 800);
   };
 
-  const corePlans = [
-    {
-      name: 'Free',
-      price: 0,
-      description: 'For quick summaries and basic understanding.',
-      cta: 'Start Free',
-      ctaType: 'free',
-      features: [
-        'Text summarization',
-        'Basic file upload (.txt)',
-        'Tone analysis',
-        'Simple key points',
-        'Limited monthly usage (10 uses/day)',
-        'Basic summary history',
-        'Access to core workspace',
-      ],
-    },
-    {
-      name: 'Starter',
-      price: getPrice(4.99, 3.99),
-      annualTotal: 47.88,
-      description: 'For students, light readers, and casual users.',
-      cta: 'Join Waitlist',
-      ctaPlanName: 'Starter',
-      features: [
-        'More monthly summaries (50/day)',
-        'Longer text input (up to 15k chars)',
-        'More file uploads (.txt, .pdf, .docx)',
-        'Better summary structure',
-        'Saved history',
-        'Copy-ready outputs',
-        'Faster processing than Free',
-      ],
-    },
-    {
-      name: 'Pro',
-      price: getPrice(9.99, 7.99),
-      annualTotal: 95.88,
-      isPopular: true,
-      description: 'For people who use Sumalyze seriously.',
-      cta: 'Join Waitlist',
-      ctaPlanName: 'Pro',
-      features: [
-        'High monthly usage limits (200/day)',
-        'Larger file uploads (up to 10MB)',
-        'PDF & document summaries',
-        'Advanced tone analysis',
-        'Key takeaways & action points',
-        'Smart rewrite options',
-        'Export to Markdown / PDF',
-        'Priority processing',
-        'Better summary depth',
-      ],
-    },
-    {
-      name: 'Max',
-      price: getPrice(19.99, 15.99),
-      annualTotal: 191.88,
-      description: 'For heavy users who want a daily clarity workspace.',
-      cta: 'Join Waitlist',
-      ctaPlanName: 'Max',
-      features: [
-        'Very high monthly usage limits',
-        'Batch document processing',
-        'Larger uploads (up to 25MB)',
-        'Longer summaries & detail control',
-        'Advanced analysis modes',
-        'Saved workspaces / folders',
-        'Priority queue access',
-        'Early access to new features',
-        'Premium 24/7 support',
-      ],
-    },
-  ];
+  const getPriceDisplay = (plan: Plan) => {
+    if (plan.priceMonthly === 0) return '$0';
+    if (billingPeriod === 'annually') {
+      if (plan.id === 'starter') return '$3.25';
+      if (plan.id === 'pro') return '$6.58';
+      if (plan.id === 'max') return '$13.25';
+    }
+    return `$${plan.priceMonthly}`;
+  };
+
+  const getIntervalLabel = (plan: Plan) => {
+    if (plan.priceMonthly === 0) return '';
+    return '/ month';
+  };
+
+  // Styling helpers
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '11px 14px',
+    background: 'rgba(10,0,15,0.6)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10,
+    fontSize: 14,
+    color: 'white',
+    fontFamily: 'inherit',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    display: 'block',
+    marginBottom: 6,
+  };
 
   return (
-    <div style={{ padding: '120px 20px 80px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: '120px 20px 80px', maxWidth: 1200, margin: '0 auto', boxSizing: 'border-box' }}>
+      
       {/* Page Header */}
       <div style={{ textAlign: 'center', marginBottom: 48 }} className="animate-reveal">
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            marginBottom: 16,
-            padding: '5px 14px 5px 10px',
-            borderRadius: 32,
-            border: '1px solid rgba(226,62,87,0.2)',
-            background: 'rgba(226,62,87,0.04)',
-          }}
-        >
-          <Sparkles size={14} style={{ color: '#E23E57' }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#ff8fa3', letterSpacing: '0.05em' }}>
-            PRICING PLANS
-          </span>
-        </div>
         <h1
           style={{
-            fontSize: 'clamp(32px, 5vw, 48px)',
+            fontSize: 'clamp(32px, 5vw, 44px)',
             fontWeight: 600,
             letterSpacing: '-0.02em',
             color: 'white',
             marginBottom: 16,
           }}
         >
-          Flexible plans for any workload
+          Pick your clarity
         </h1>
-        <p style={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.5)', maxWidth: 600, margin: '0 auto 32px', lineHeight: '24px' }}>
-          Select the option that fits your workflow. Billed transparently with zero hidden fees.
+        <p style={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.45)', maxWidth: 650, margin: '0 auto 32px', lineHeight: '24px' }}>
+          Choose a plan that fits your workload. Paid plans are in private preview before checkout integration is finalized.
         </p>
 
         {/* Billed Toggle */}
@@ -158,6 +222,7 @@ export default function PricingPage() {
               transition: 'all 0.2s',
               background: billingPeriod === 'monthly' ? '#E23E57' : 'transparent',
               color: billingPeriod === 'monthly' ? 'white' : 'rgba(255,255,255,0.5)',
+              border: 'none',
             }}
           >
             Monthly
@@ -173,279 +238,280 @@ export default function PricingPage() {
               transition: 'all 0.2s',
               background: billingPeriod === 'annually' ? '#E23E57' : 'transparent',
               color: billingPeriod === 'annually' ? 'white' : 'rgba(255,255,255,0.5)',
+              border: 'none',
             }}
           >
-            Annually <span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 600, marginLeft: 2 }}>Save ~20%</span>
+            Annually <span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 600, marginLeft: 2 }}>Save ~18%</span>
           </button>
         </div>
       </div>
 
-      {/* Honest Note */}
-      <div
-        style={{
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-          borderRadius: 12,
-          padding: '12px 20px',
-          maxWidth: 720,
-          margin: '0 auto 48px',
-          textAlign: 'center',
-          fontSize: 13,
-          color: 'rgba(255, 255, 255, 0.45)',
-          lineHeight: '18px',
-        }}
-        className="animate-reveal delay-75"
-      >
-        ℹ️ <strong>Developer Notice:</strong> Payment gateway integrations are currently inactive. Free tiers are fully operational. Billed plans are in private preview — sign up to join the waitlist.
-      </div>
-
-      {/* 4 Core Plans Grid */}
+      {/* Plan Grid */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 20,
-          marginBottom: 32,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: 24,
+          marginBottom: 48,
         }}
         className="animate-reveal delay-100"
       >
-        {corePlans.map((plan) => (
-          <div
-            key={plan.name}
-            className="hover-card"
-            style={{
-              background: 'rgba(255, 255, 255, 0.015)',
-              border: plan.isPopular ? '1px solid rgba(226,62,87,0.4)' : '1px solid rgba(255, 255, 255, 0.07)',
-              borderRadius: 20,
-              padding: 32,
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              boxShadow: plan.isPopular ? '0 12px 40px rgba(226,62,87,0.06)' : 'none',
-            }}
-          >
-            {plan.isPopular && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: -12,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: 'linear-gradient(90deg, #E23E57, #88304E)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 20,
-                  padding: '4px 14px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: 'white',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  boxShadow: '0 4px 12px rgba(226,62,87,0.3)',
-                }}
-              >
-                Most Popular
+        {PLANS.map((plan) => {
+          const isPro = plan.id === 'pro';
+          return (
+            <div
+              key={plan.id}
+              className="hover-card"
+              style={{
+                background: 'rgba(255, 255, 255, 0.015)',
+                border: isPro ? '1px solid rgba(226,62,87,0.45)' : '1px solid rgba(255, 255, 255, 0.07)',
+                borderRadius: 20,
+                padding: '36px 28px',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                boxShadow: isPro ? '0 12px 40px rgba(226,62,87,0.08)' : 'none',
+              }}
+            >
+              {isPro && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -12,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'linear-gradient(90deg, #E23E57, #88304E)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 20,
+                    padding: '4px 14px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'white',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    boxShadow: '0 4px 12px rgba(226,62,87,0.3)',
+                  }}
+                >
+                  Best Value
+                </div>
+              )}
+
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: 'white', marginBottom: 8 }}>{plan.name}</h3>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', minHeight: 40, lineHeight: '18px', marginBottom: 20 }}>
+                {plan.description}
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                <span style={{ fontSize: 32, fontWeight: 700, color: 'white' }}>{getPriceDisplay(plan)}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>{getIntervalLabel(plan)}</span>
               </div>
-            )}
 
-            <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', marginBottom: 8 }}>{plan.name}</h3>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', minHeight: 40, lineHeight: '18px', marginBottom: 20 }}>
-              {plan.description}
-            </p>
+              {/* Annual billing detail */}
+              {billingPeriod === 'annually' && plan.priceAnnually > 0 ? (
+                <div style={{ fontSize: 11, color: '#6ee7b7', marginBottom: 20, fontWeight: 500 }}>
+                  Billed annually at ${plan.priceAnnually}/year
+                </div>
+              ) : (
+                <div style={{ height: plan.priceMonthly > 0 ? 16 : 0, marginBottom: plan.priceMonthly > 0 ? 20 : 0 }} />
+              )}
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 24 }}>
-              <span style={{ fontSize: 36, fontWeight: 700, color: 'white' }}>${plan.price}</span>
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>/month</span>
+              {/* CTA Button */}
+              {plan.id === 'free' ? (
+                <a
+                  href="/tools"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate('tools');
+                  }}
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    padding: '12px',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: 'white',
+                    marginBottom: 24,
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                >
+                  {plan.cta}
+                </a>
+              ) : (
+                <button
+                  onClick={() => handlePaidCtaClick(plan)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: isPro
+                      ? 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)'
+                      : 'rgba(255,255,255,0.05)',
+                    color: 'white',
+                    boxShadow: isPro ? '0 4px 16px rgba(226,62,87,0.3)' : 'none',
+                    marginBottom: 24,
+                    fontFamily: 'inherit',
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                >
+                  {plan.cta}
+                </button>
+              )}
+
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 20 }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+                {/* Included features */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    You Get
+                  </div>
+                  <ul style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {PLAN_FEATURES[plan.id]?.included.map((feat) => (
+                      <li key={feat} style={{ display: 'flex', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: '18px' }}>
+                        <Check size={14} style={{ color: '#34d399', flexShrink: 0, marginTop: 2 }} />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Excluded features */}
+                {PLAN_FEATURES[plan.id]?.excluded.length > 0 && (
+                  <div style={{ borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                      Limits
+                    </div>
+                    <ul style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {PLAN_FEATURES[plan.id]?.excluded.map((feat) => (
+                        <li key={feat} style={{ display: 'flex', gap: 8, fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: '18px' }}>
+                          <X size={14} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0, marginTop: 2 }} />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
-
-            {billingPeriod === 'annually' && plan.annualTotal && (
-              <div style={{ fontSize: 11, color: '#6ee7b7', marginTop: -20, marginBottom: 20, fontWeight: 500 }}>
-                Billed annually (${plan.annualTotal}/year)
-              </div>
-            )}
-
-            {plan.ctaType === 'free' ? (
-              <a
-                href="/tools"
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  padding: '12px',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  color: 'white',
-                  marginBottom: 28,
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-              >
-                {plan.cta}
-              </a>
-            ) : (
-              <button
-                onClick={() => setWaitlistPlan(plan.name)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: plan.isPopular
-                    ? 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)'
-                    : 'rgba(255,255,255,0.05)',
-                  color: 'white',
-                  boxShadow: plan.isPopular ? '0 4px 16px rgba(226,62,87,0.3)' : 'none',
-                  marginBottom: 28,
-                  fontFamily: 'inherit',
-                  transition: 'opacity 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-              >
-                {plan.cta}
-              </button>
-            )}
-
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 20 }} />
-
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-              {plan.features.map((feat) => (
-                <li key={feat} style={{ display: 'flex', gap: 10, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: '18px' }}>
-                  <Check size={14} style={{ color: plan.isPopular ? '#ff8fa3' : '#34d399', flexShrink: 0, marginTop: 2 }} />
-                  <span>{feat}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* 2. Team Plan - Wide Banner */}
+      {/* Team Workspace Card (Centered, Rectangular) */}
       <div
         className="hover-card animate-reveal delay-150"
         style={{
-          background: 'linear-gradient(135deg, rgba(20, 10, 30, 0.4) 0%, rgba(10, 5, 20, 0.6) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.07)',
-          borderRadius: 20,
-          padding: '36px 40px',
-          marginBottom: 32,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 24,
+          background: 'linear-gradient(135deg, rgba(20, 10, 30, 0.45) 0%, rgba(10, 5, 20, 0.65) 100%)',
+          border: '1px solid rgba(226, 62, 87, 0.3)',
+          borderRadius: 24,
+          padding: '28px 32px',
+          maxWidth: 900,
+          margin: '0 auto 48px',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+          boxSizing: 'border-box',
         }}
       >
-        <div style={{ maxWidth: 640 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <Users size={18} style={{ color: '#E23E57' }} />
-            <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: 0 }}>Team Workspace</h3>
-            <span style={{ fontSize: 11, background: 'rgba(52, 211, 153, 0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)', padding: '2px 8px', borderRadius: 99, fontWeight: 600 }}>MIN 3 USERS</span>
-          </div>
-          <p style={{ fontSize: 14, color: 'rgba(255, 255, 255, 0.5)', lineHeight: '22px', margin: 0 }}>
-            Shared workspaces, centralized billing, custom quotas, and collaborated analysis summaries. Ideal for startups, research groups, and operational teams.
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 220 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-            <span style={{ fontSize: 32, fontWeight: 700, color: 'white' }}>${getPrice(12, 9)}</span>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>/user/month</span>
-          </div>
-          {billingPeriod === 'annually' && (
-            <span style={{ fontSize: 11, color: '#6ee7b7', marginBottom: 16, fontWeight: 500 }}>Billed annually ($108/user/year)</span>
-          )}
-          <button
-            onClick={() => setWaitlistPlan('Team')}
-            style={{
-              padding: '10px 24px',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-              border: '1px solid rgba(226,62,87,0.35)',
-              background: 'rgba(226,62,87,0.06)',
-              color: '#ff8fa3',
-              width: '100%',
-              fontFamily: 'inherit',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(226,62,87,0.12)'; e.currentTarget.style.color = 'white'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(226,62,87,0.06)'; e.currentTarget.style.color = '#ff8fa3'; }}
-          >
-            Join Team Waitlist
-          </button>
-        </div>
-      </div>
-
-      {/* 3. Supporter - Pay What You Want */}
-      <div
-        className="hover-card animate-reveal delay-200"
-        style={{
-          background: 'rgba(10, 0, 15, 0.6)',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: 20,
-          padding: 32,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 24,
-        }}
-      >
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', maxWidth: 640 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(226,62,87,0.08)', border: '1px solid rgba(226,62,87,0.2)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#E23E57' }}>
-            <Heart size={20} fill="#E23E57" />
-          </div>
-          <div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: 'white', marginBottom: 6 }}>Supporter (Pay what you want)</h3>
-            <p style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.45)', lineHeight: '18px', margin: 0 }}>
-              Help keep Sumalyze accessible and free for everyone. Supporters receive a special profile badge, optional name listing on the supporter wall, and early feature access.
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 32,
+          }}
+          className="team-rectangular-layout"
+        >
+          <style>{`
+            @media(max-width: 768px) {
+              .team-rectangular-layout {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                text-align: center !important;
+                gap: 20px !important;
+              }
+            }
+          `}</style>
+          
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, justifyContent: 'flex-start' }} className="team-title-layout">
+              <style>{`
+                @media(max-width: 768px) {
+                  .team-title-layout {
+                    justify-content: center !important;
+                  }
+                }
+              `}</style>
+              <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', margin: 0 }}>{TEAM_PLAN.name}</h3>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8fa3', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'rgba(226,62,87,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(226,62,87,0.2)' }}>
+                {TEAM_PLAN.priceDescription}
+              </span>
+            </div>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', lineHeight: '22px', margin: '0 0 16px 0' }}>
+              For teams that need shared clarity, saved outputs, member roles, and custom usage.
             </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="team-chips-layout">
+              <style>{`
+                @media(max-width: 768px) {
+                  .team-chips-layout {
+                    justify-content: center !important;
+                  }
+                }
+              `}</style>
+              {['Shared history', 'Member roles', 'Custom usage', 'Manual onboarding'].map(chip => (
+                <span key={chip} style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 20 }}>
+                  • {chip}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-        <div>
-          <a
-            href="https://ko-fi.com/sumalyze"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '12px 28px',
-              borderRadius: 12,
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: 'none',
-              background: '#FF5E5B',
-              color: 'white',
-              boxShadow: '0 4px 16px rgba(255,94,91,0.25)',
-              transition: 'transform 0.15s',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            Support on Ko-fi
-          </a>
+
+          <div style={{ flexShrink: 0 }}>
+            <button
+              onClick={() => onNavigate('team-workspace')}
+              style={{
+                padding: '14px 28px',
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: 'none',
+                background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+                color: 'white',
+                boxShadow: '0 4px 16px rgba(226,62,87,0.3)',
+                fontFamily: 'inherit',
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              {TEAM_PLAN.cta}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Relocated Mission / Ledgers Section */}
       <MissionSection />
 
-      {/* Waitlist Modal (Centered immediately overlay) */}
-      {waitlistPlan && (
+      {/* Paid Plan Informational Modal */}
+      {selectedPlanForUpgrade && (
         <>
           {/* Backdrop */}
           <div
-            onClick={() => setWaitlistPlan('')}
+            onClick={() => setSelectedPlanForUpgrade(null)}
             style={{
               position: 'fixed',
               inset: 0,
@@ -455,7 +521,7 @@ export default function PricingPage() {
               animation: 'backdropFadeIn 0.2s ease both',
             }}
           />
-          {/* Box */}
+          {/* Modal content */}
           <div
             style={{
               position: 'fixed',
@@ -464,7 +530,7 @@ export default function PricingPage() {
               transform: 'translate(-50%, -50%)',
               zIndex: 9999,
               width: 'calc(100% - 32px)',
-              maxWidth: 420,
+              maxWidth: 440,
               background: 'rgba(14,4,22,0.98)',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 20,
@@ -473,47 +539,75 @@ export default function PricingPage() {
               animation: 'modalFadeInCenter 0.25s cubic-bezier(0.16, 1, 0.3, 1) both',
               boxSizing: 'border-box',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedPlanForUpgrade(null)}
+              style={{
+                position: 'absolute', top: 16, right: 16,
+                width: 28, height: 28, borderRadius: 8,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.4)',
+                fontSize: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >✕</button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <MessageSquare size={20} style={{ color: '#E23E57' }} />
-              <h3 style={{ fontSize: 18, fontWeight: 600, color: 'white', margin: 0 }}>Join {waitlistPlan} Waitlist</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: 'white', margin: 0 }}>
+                {selectedPlanForUpgrade.name} Plan
+              </h3>
             </div>
-            
-            {waitlistSubmitted ? (
+
+            {notifySuccess ? (
               <div style={{ textAlign: 'center', padding: '16px 0' }}>
                 <span style={{ fontSize: 32 }}>🎉</span>
-                <p style={{ fontSize: 14, color: '#34d399', fontWeight: 500, margin: '8px 0 4px' }}>You're on the list!</p>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>We'll notify you as soon as {waitlistPlan} is ready.</p>
+                <h4 style={{ fontSize: 15, color: '#34d399', fontWeight: 600, marginTop: 8, marginBottom: 4 }}>You're on the preview list!</h4>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+                  We will contact you once {selectedPlanForUpgrade.name} is ready for activation.
+                </p>
               </div>
             ) : (
-              <form onSubmit={handleWaitlistSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '18px', margin: 0 }}>
-                  Enter your email address below to secure your early access pricing. We will contact you once the tier launches.
+              <form onSubmit={handleNotifySubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: 500, margin: 0 }}>
+                  Billing is almost ready!
                 </p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '18px', margin: 0 }}>
+                  We are integrating Paddle checkout for safe and recur-compliant billing. We will notify you as soon as the {selectedPlanForUpgrade.name} plan goes live.
+                </p>
+                
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10, padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>Plan:</span>
+                    <span style={{ color: 'white', fontWeight: 500 }}>{selectedPlanForUpgrade.name}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 6 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>Pricing:</span>
+                    <span style={{ color: 'white', fontWeight: 500 }}>
+                      {getPriceDisplay(selectedPlanForUpgrade)}{getIntervalLabel(selectedPlanForUpgrade)}
+                    </span>
+                  </div>
+                </div>
+
                 <div>
+                  <label style={labelStyle}>Notification Email</label>
                   <input
                     type="email"
                     required
-                    value={waitlistEmail}
-                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    value={notifyEmail}
+                    onChange={(e) => setNotifyEmail(e.target.value)}
                     placeholder="you@example.com"
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      background: 'rgba(10,0,15,0.6)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 10,
-                      fontSize: 14,
-                      color: 'rgba(255,255,255,0.9)',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
+                    style={inputStyle}
                   />
                 </div>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
                   <button
                     type="button"
-                    onClick={() => setWaitlistPlan('')}
+                    onClick={() => setSelectedPlanForUpgrade(null)}
                     style={{
                       padding: '8px 16px',
                       borderRadius: 8,
@@ -529,19 +623,20 @@ export default function PricingPage() {
                   </button>
                   <button
                     type="submit"
+                    disabled={notifyLoading}
                     style={{
                       padding: '8px 20px',
                       borderRadius: 8,
                       fontSize: 13,
                       fontWeight: 500,
-                      cursor: 'pointer',
+                      cursor: notifyLoading ? 'not-allowed' : 'pointer',
                       border: 'none',
                       background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
                       color: 'white',
                       fontFamily: 'inherit',
                     }}
                   >
-                    Submit
+                    {notifyLoading ? 'Submitting...' : 'Notify Me'}
                   </button>
                 </div>
               </form>
@@ -553,95 +648,83 @@ export default function PricingPage() {
   );
 }
 
-/* ─── Shared Layout Components ───────────────────────────────── */
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(28px, 4vw, 42px)', lineHeight: '1.2', letterSpacing: '-0.02em', textAlign: 'center', margin: '0 0 16px', background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent' }}>
-      {children}
-    </h2>
-  );
-}
-
-function SectionDesc({ children }: { children: React.ReactNode }) {
-  return (
-    <p style={{ fontSize: 16, color: 'rgba(239,237,253,0.6)', lineHeight: '26px', maxWidth: 500, margin: '0 auto', textAlign: 'center' }}>
-      {children}
-    </p>
-  );
-}
-
 /* ─── Relocated Mission / cost ledger ─────────────────────────────── */
 
 function MissionSection() {
   return (
-    <section id="mission" style={{ padding: '120px 0 60px', borderTop: '1px solid rgba(255,255,255,0.03)', marginTop: 80, background: 'rgba(226,62,87,0.01)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionTitle>MVP Free first, supported by you</SectionTitle>
-        <SectionDesc>We believe advanced text comprehension tools should be private and open. Sumalyze is an independent project.</SectionDesc>
+    <section id="mission" style={{ padding: '60px 0 20px', marginTop: 40 }}>
+      <div 
+        style={{ 
+          maxWidth: 900, 
+          margin: '0 auto', 
+          background: 'rgba(255, 255, 255, 0.01)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: 24,
+          padding: '40px 32px',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 600, fontSize: 'clamp(24px, 3vw, 32px)', lineHeight: '1.2', letterSpacing: '-0.02em', color: 'white', margin: '0 0 12px' }}>
+            Built lean. Priced fairly.
+          </h2>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', lineHeight: '22px', maxWidth: 600, margin: '0 auto 20px' }}>
+            Start free, upgrade only when Sumalyze actually saves you time. Supporters help keep the product moving while billing rolls out.
+          </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 32, marginTop: 48, alignItems: 'center' }} className="mission-grid-layout">
-          <style>{`
-            @media(max-width: 768px) {
-              .mission-grid-layout {
-                grid-template-columns: 1fr !important;
-              }
-            }
-          `}</style>
-          
-          {/* Left Column: Philosophical overview */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <h3 style={{ fontSize: 24, fontWeight: 500, color: 'white' }}>No paywalls. No subscription trap.</h3>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: '1.7' }}>
-              Most AI productivity tools want a monthly subscription before you can even paste your first document. We built Sumalyze on a different philosophy: it should be accessible to anyone.
-            </p>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: '1.7' }}>
-              We do not run advertisements, we do not track your search history, and we do not sell your document data. We are kept online purely through small, voluntary contributions from readers who find our workspace useful.
-            </p>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
-              {['No credit card required', 'No tracking pixels', 'Independent project'].map(val => (
-                <span key={val} style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#34d399' }}>✓</span> {val}
-                </span>
-              ))}
-            </div>
+          <div style={{ display: 'inline-flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', background: 'rgba(255,255,255,0.02)', padding: '8px 16px', borderRadius: 32, border: '1px solid rgba(255,255,255,0.04)' }}>
+            {[
+              'Free access stays useful',
+              'Paid plans unlock heavier usage',
+              'Ko-fi supporters can receive 7 days of Pro access'
+            ].map(val => (
+              <span key={val} style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: '#ff8fa3', fontWeight: 600 }}>✓</span> {val}
+              </span>
+            ))}
           </div>
+        </div>
 
-          {/* Right Column: Ledger Transparency Card */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24, justifyContent: 'center', maxWidth: 460, margin: '0 auto' }}>
+          {/* Ledger Transparency Card */}
           <div className="hover-card" style={{
             background: 'linear-gradient(145deg, rgba(226,62,87,0.1) 0%, rgba(10,0,15,0.4) 100%)',
             border: '1px solid rgba(226,62,87,0.22)',
-            borderRadius: 20, padding: 28,
-            boxShadow: '0 16px 40px rgba(0,0,0,0.4)'
+            borderRadius: 20, padding: 24,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.3)'
           }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8fa3', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Project Ledgers</span>
-            <h4 style={{ fontSize: 18, fontWeight: 600, color: 'white', marginTop: 4, marginBottom: 16 }}>Hosting Cost Coverage</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#ff8fa3', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Project Ledgers</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Hosting Cost Coverage</span>
+            </div>
             
             {/* Cost Ledger Rows */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 16, marginBottom: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 12, marginBottom: 12 }}>
               {[
                 { item: 'AI API Processing', cost: '$0.001 / query' },
                 { item: 'Server Hosting & Database', cost: '$45 / month' },
                 { item: 'SSL & Domain Maintenance', cost: '$12 / year' }
               ].map(row => (
-                <div key={row.item} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <div key={row.item} style={{ display: 'flex', justifyItems: 'space-between', justifyContent: 'space-between', fontSize: 12 }}>
                   <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.item}</span>
                   <span style={{ color: 'white', fontFamily: 'monospace' }}>{row.cost}</span>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', justifyItems: 'space-between', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Average Coffee Support</p>
-                <p style={{ fontSize: 20, fontWeight: 600, color: 'white' }}>$3.00 / donor</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Average Coffee Support</p>
+                <p style={{ fontSize: 18, fontWeight: 600, color: 'white', margin: 0 }}>$3.00 / donor</p>
               </div>
               <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer"
                 className="hover-glow"
+                onClick={() => captureEvent('upgrade_clicked', { plan: 'Supporter', type: 'ko_fi_ledger' })}
                 style={{
-                  padding: '12px 20px', borderRadius: 10, fontSize: 13, fontWeight: 500, color: 'white', textDecoration: 'none',
+                  padding: '10px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: 'white', textDecoration: 'none',
                   background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
-                  boxShadow: '0 4px 14px rgba(226,62,87,0.3)', display: 'inline-flex', alignItems: 'center', gap: 6
+                  boxShadow: '0 4px 12px rgba(226,62,87,0.3)', display: 'inline-flex', alignItems: 'center', gap: 6
                 }}>
                 ☕ Support on Ko-fi
               </a>

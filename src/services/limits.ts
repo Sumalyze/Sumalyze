@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { getDailyLimit, getAnalysisLimit } from '../lib/plans';
 
 export const GUEST_LIMITS = {
   demo:      10,  // guest daily limit for the main demo analyzer
@@ -139,20 +140,90 @@ export function incrementUsage(feature: LimitFeature, isLoggedIn: boolean): void
   }
 }
 
-export function isLimitReached(feature: LimitFeature, isLoggedIn: boolean): boolean {
+export function isLimitReached(feature: LimitFeature, isLoggedIn: boolean, plan: string = 'free'): boolean {
+  const p = plan.toLowerCase();
+
   if (isLoggedIn) {
     if (feature === 'demo') return false;
-    const limit = feature === 'agent' ? LOGGED_IN_LIMITS.agent : LOGGED_IN_LIMITS.tools;
-    return getUsageToday(feature, true) >= limit;
+    if (feature === 'agent' && p === 'free') return true;
+
+    try {
+      const cached = sessionStorage.getItem('sz_supabase_limits');
+      if (cached) {
+        const parsed: ServerLimits = JSON.parse(cached);
+        const dailyTool = parsed.daily_tool_runs || 0;
+        const dailyAgent = parsed.daily_agent_runs || 0;
+        const totalDaily = dailyTool + dailyAgent;
+        const dailyLimit = getDailyLimit(p);
+
+        // 1. Enforce Daily Limit (total of tool + agent runs)
+        if (totalDaily >= dailyLimit) {
+          return true;
+        }
+
+        // 2. Enforce Monthly Limit (total of tool + agent runs)
+        const monthlyTool = parsed.monthly_tool_runs || 0;
+        const monthlyAgent = parsed.monthly_agent_runs || 0;
+        const totalMonthly = monthlyTool + monthlyAgent;
+        const monthlyLimit = getAnalysisLimit(p);
+        if (totalMonthly >= monthlyLimit) {
+          return true;
+        }
+
+        // TODO: Enforce monthly agent limit (e.g. Starter: 3, Pro: 50, Max: 150) once server supports resetting monthly counter.
+      }
+    } catch (err) {
+      console.error('[limits] Failed to parse cached limits:', err);
+    }
+    return false;
+  } else {
+    // Guest is on Free plan
+    if (feature === 'agent') return true;
+    
+    // Free plan allows up to 3 analyses/day total (demo + tools)
+    const demoUsage = getGuestUsageToday('demo');
+    const toolsUsage = getGuestUsageToday('tools');
+    const totalGuestUsage = demoUsage + toolsUsage;
+    
+    return totalGuestUsage >= 3;
   }
-  return getGuestUsageToday(feature) >= GUEST_LIMITS[feature];
 }
 
-export function getRemainingUses(feature: LimitFeature, isLoggedIn: boolean): number {
+export function getRemainingUses(feature: LimitFeature, isLoggedIn: boolean, plan: string = 'free'): number {
+  const p = plan.toLowerCase();
+
   if (isLoggedIn) {
     if (feature === 'demo') return 999;
-    const limit = feature === 'agent' ? LOGGED_IN_LIMITS.agent : LOGGED_IN_LIMITS.tools;
-    return Math.max(0, limit - getUsageToday(feature, true));
+    if (feature === 'agent' && p === 'free') return 0;
+
+    try {
+      const cached = sessionStorage.getItem('sz_supabase_limits');
+      if (cached) {
+        const parsed: ServerLimits = JSON.parse(cached);
+        const dailyTool = parsed.daily_tool_runs || 0;
+        const dailyAgent = parsed.daily_agent_runs || 0;
+        const totalDaily = dailyTool + dailyAgent;
+        const dailyLimit = getDailyLimit(p);
+
+        const monthlyTool = parsed.monthly_tool_runs || 0;
+        const monthlyAgent = parsed.monthly_agent_runs || 0;
+        const totalMonthly = monthlyTool + monthlyAgent;
+        const monthlyLimit = getAnalysisLimit(p);
+
+        const remainingDaily = Math.max(0, dailyLimit - totalDaily);
+        const remainingMonthly = Math.max(0, monthlyLimit - totalMonthly);
+
+        return Math.min(remainingDaily, remainingMonthly);
+      }
+    } catch {}
+    return getDailyLimit(p);
+  } else {
+    if (feature === 'agent') return 0;
+    
+    const demoUsage = getGuestUsageToday('demo');
+    const toolsUsage = getGuestUsageToday('tools');
+    const totalGuestUsage = demoUsage + toolsUsage;
+    
+    return Math.max(0, 3 - totalGuestUsage);
   }
-  return Math.max(0, GUEST_LIMITS[feature] - getGuestUsageToday(feature));
 }

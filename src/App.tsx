@@ -4,19 +4,40 @@ import type { AnalysisResult } from './utils/mockAnalyzer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthModal from './components/AuthModal';
 import FeedbackModal from './components/FeedbackModal';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import CookiePolicy from './pages/CookiePolicy';
+import RefundPolicy from './pages/RefundPolicy';
+import BillingTerms from './pages/BillingTerms';
+import DataDeletion from './pages/DataDeletion';
+import SupportPage from './pages/SupportPage';
 import ToolsPage from './pages/ToolsPage';
 import ToolDetailPage from './pages/ToolDetailPage';
 import AgentPage from './pages/AgentPage';
+import CookieConsent from './components/CookieConsent';
 import WorkflowsPage from './pages/WorkflowsPage';
 import UseCasesPage from './pages/UseCasesPage';
 import HistoryPage from './pages/HistoryPage';
 import PricingPage from './pages/PricingPage';
+import SettingsPage from './pages/SettingsPage';
+import TeamWorkspacePage from './pages/TeamWorkspacePage';
+import MaintenancePage from './pages/MaintenancePage';
 import sumalyzeLogo from './assets/sumalyzelogo.png';
 import { ToastProvider } from './components/Toast';
 import { parseFile } from './utils/fileParser';
 import { TOOLS } from './data/tools';
+import { useCurrentPlan } from './hooks/useCurrentPlan';
+import { getFileUploadLimitMB } from './lib/plans';
+import HeroMockup from './components/HeroMockup';
+import HomeModesScrollSection from './components/HomeModesScrollSection';
+import UseCaseStorySection from './components/UseCaseStorySection';
+import DemoRevealSection from './components/DemoRevealSection';
+import WhySumalyzeSection from './components/WhySumalyzeSection';
+import TrustSection from './components/TrustSection';
+import { initAnalytics, captureEvent, capturePageView } from './lib/analytics';
 
 
 
@@ -24,7 +45,7 @@ import { TOOLS } from './data/tools';
    Sumalyze — AI Clarity Workspace
    ============================================================ */
 
-type Page = 'home' | 'privacy' | 'terms' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing';
+type Page = 'home' | 'privacy' | 'terms' | 'cookies' | 'refund' | 'billing' | 'data-deletion' | 'support' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing' | 'login' | 'signup' | 'forgot-password' | 'settings' | 'team-workspace';
 
 const hashToPathMap: Record<string, string> = {
   tools: '/tools',
@@ -32,16 +53,66 @@ const hashToPathMap: Record<string, string> = {
   workflows: '/workflows',
   usecases: '/use-cases',
   history: '/history',
+  settings: '/settings',
   privacy: '/privacy',
   terms: '/terms',
-  pricing: '/pricing'
+  pricing: '/pricing',
+  'team-workspace': '/team-workspace',
+  cookies: '/cookies',
+  refund: '/refund',
+  billing: '/billing',
+  'data-deletion': '/data-deletion',
+  support: '/support'
 };
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ToastProvider>
+  );
+}
+
+function AppContent() {
   const [page, setPage] = useState<Page>('home');
   const [toolSlug, setToolSlug] = useState<string>('');
   const [authOpen, setAuthOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    initAnalytics();
+    const handleConsentChange = () => {
+      initAnalytics();
+    };
+    window.addEventListener('sumalyze-cookie-consent-changed', handleConsentChange);
+    return () => {
+      window.removeEventListener('sumalyze-cookie-consent-changed', handleConsentChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalNav = (e: Event) => {
+      const customEvent = e as CustomEvent<Page>;
+      if (customEvent.detail) {
+        navigate(customEvent.detail);
+      }
+    };
+    window.addEventListener('sz-navigate', handleGlobalNav);
+    return () => window.removeEventListener('sz-navigate', handleGlobalNav);
+  }, []);
+
+  useEffect(() => {
+    capturePageView(window.location.pathname, `${page.charAt(0).toUpperCase() + page.slice(1)} | Sumalyze`);
+    
+    // Specifically track legal_page_viewed
+    const legalPages = ['privacy', 'terms', 'cookies', 'refund', 'billing', 'data-deletion', 'support'];
+    if (legalPages.includes(page)) {
+      captureEvent('legal_page_viewed', { page });
+    }
+  }, [page]);
 
   // Pathname-based routing with backward compatibility for hash routes
   useEffect(() => {
@@ -75,12 +146,32 @@ export default function App() {
         setPage('usecases');
       } else if (path === '/history') {
         setPage('history');
+      } else if (path === '/settings') {
+        setPage('settings');
       } else if (path === '/pricing') {
         setPage('pricing');
+      } else if (path === '/team-workspace') {
+        setPage('team-workspace');
       } else if (path === '/privacy') {
         setPage('privacy');
       } else if (path === '/terms') {
         setPage('terms');
+      } else if (path === '/cookies') {
+        setPage('cookies');
+      } else if (path === '/refund') {
+        setPage('refund');
+      } else if (path === '/billing') {
+        setPage('billing');
+      } else if (path === '/data-deletion') {
+        setPage('data-deletion');
+      } else if (path === '/support') {
+        setPage('support');
+      } else if (path === '/login') {
+        setPage('login');
+      } else if (path === '/signup') {
+        setPage('signup');
+      } else if (path === '/forgot-password') {
+        setPage('forgot-password');
       } else {
         setPage('home');
         setToolSlug('');
@@ -94,9 +185,20 @@ export default function App() {
 
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
 
+  // Auth Redirection: If logged in user is on home, login, or signup, send to tools. If not logged in and on settings, send to login.
+  useEffect(() => {
+    if (user && (page === 'home' || page === 'login' || page === 'signup')) {
+      navigate('tools');
+    } else if (!user && page === 'settings') {
+      navigate('login');
+    }
+  }, [user, page]);
+
   const navigate = (p: Page) => {
     let path = '/';
     if (p === 'usecases') path = '/use-cases';
+    else if (p === 'forgot-password') path = '/forgot-password';
+    else if (p === 'team-workspace') path = '/team-workspace';
     else if (p !== 'home') path = `/${p}`;
     
     if (window.location.pathname !== path) {
@@ -121,66 +223,128 @@ export default function App() {
     navigate('home');
   };
 
-  if (page === 'privacy') return <ToastProvider><AuthProvider><PrivacyPolicy onClose={() => navigate('home')} /></AuthProvider></ToastProvider>;
-  if (page === 'terms')   return <ToastProvider><AuthProvider><TermsOfService onClose={() => navigate('home')} /></AuthProvider></ToastProvider>;
+  const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+  const isProtectedRoute = ['tools', 'tooldetail', 'agent', 'workflows', 'history', 'settings', 'login', 'signup', 'forgot-password'].includes(page);
+
+  if (isMaintenanceMode && isProtectedRoute) {
+    return <MaintenancePage />;
+  }
 
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', overflowX: 'hidden', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-          <Header onLoginClick={() => setAuthOpen(true)} onNavigate={navigate} onNavigateTool={navigateToTool} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
+    <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
+      <Header onNavigate={navigate} onNavigateTool={navigateToTool} onFeedbackClick={() => setFeedbackOpen(true)} currentPage={page} />
 
-          {page === 'tools' && (
-            <div className="page-enter">
-              <ToolsPage onSignIn={() => setAuthOpen(true)} onNavigateTool={navigateToTool} />
-            </div>
-          )}
-          {page === 'tooldetail' && (
-            <div className="page-enter">
-              <ToolDetailPage slug={toolSlug} onNavigate={navigatePath} onSignIn={() => setAuthOpen(true)} />
-            </div>
-          )}
-          {page === 'agent' && (
-            <div className="page-enter">
-              <AgentPage onSignIn={() => setAuthOpen(true)} />
-            </div>
-          )}
-          {page === 'workflows' && (
-            <div className="page-enter">
-              <WorkflowsPage onNavigateAgent={() => navigate('agent')} />
-            </div>
-          )}
-          {page === 'usecases' && (
-            <div className="page-enter">
-              <UseCasesPage onNavigateTools={() => navigate('tools')} onNavigateAgent={() => navigate('agent')} />
-            </div>
-          )}
-          {page === 'pricing' && (
-            <div className="page-enter">
-              <PricingPage />
-            </div>
-          )}
-          {page === 'history' && (
-            <div className="page-enter">
-              <HistoryPage />
-            </div>
-          )}
-          {page === 'home' && (
-            <>
-              <Hero onNavigate={navigate} />
-              <FromToolToAgentSection onNavigate={navigate} />
-              <AudienceSection />
-              <DemoSection />
-              <FinalCTA onNavigate={navigate} />
-            </>
-          )}
-
-          <Footer onNavigate={navigate} onFeedbackClick={() => setFeedbackOpen(true)} />
-          <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-          <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      {page === 'tools' && (
+        <div className="page-enter">
+          <ToolsPage onSignIn={() => setAuthOpen(true)} onNavigateTool={navigateToTool} />
         </div>
-      </AuthProvider>
-    </ToastProvider>
+      )}
+      {page === 'tooldetail' && (
+        <div className="page-enter">
+          <ToolDetailPage slug={toolSlug} onNavigate={navigatePath} onSignIn={() => setAuthOpen(true)} />
+        </div>
+      )}
+      {page === 'agent' && (
+        <div className="page-enter">
+          <AgentPage onSignIn={() => setAuthOpen(true)} />
+        </div>
+      )}
+      {page === 'workflows' && (
+        <div className="page-enter">
+          <WorkflowsPage onNavigateAgent={() => navigate('agent')} />
+        </div>
+      )}
+      {page === 'usecases' && (
+        <div className="page-enter">
+          <UseCasesPage onNavigateTools={() => navigate('tools')} onNavigateAgent={() => navigate('agent')} />
+        </div>
+      )}
+      {page === 'pricing' && (
+        <div className="page-enter">
+          <PricingPage onNavigate={navigate} />
+        </div>
+      )}
+      {page === 'team-workspace' && (
+        <div className="page-enter">
+          <TeamWorkspacePage onNavigate={navigate} />
+        </div>
+      )}
+      {page === 'history' && (
+        <div className="page-enter">
+          <HistoryPage />
+        </div>
+      )}
+      {page === 'settings' && (
+        <div className="page-enter">
+          <SettingsPage onNavigate={navigate} />
+        </div>
+      )}
+      {page === 'privacy' && (
+        <div className="page-enter">
+          <PrivacyPolicy />
+        </div>
+      )}
+      {page === 'terms' && (
+        <div className="page-enter">
+          <TermsOfService />
+        </div>
+      )}
+      {page === 'cookies' && (
+        <div className="page-enter">
+          <CookiePolicy />
+        </div>
+      )}
+      {page === 'refund' && (
+        <div className="page-enter">
+          <RefundPolicy />
+        </div>
+      )}
+      {page === 'billing' && (
+        <div className="page-enter">
+          <BillingTerms />
+        </div>
+      )}
+      {page === 'data-deletion' && (
+        <div className="page-enter">
+          <DataDeletion />
+        </div>
+      )}
+      {page === 'support' && (
+        <div className="page-enter">
+          <SupportPage />
+        </div>
+      )}
+      {page === 'login' && (
+        <div className="page-enter">
+          <LoginPage onNavigate={navigate} />
+        </div>
+      )}
+      {page === 'signup' && (
+        <div className="page-enter">
+          <SignupPage onNavigate={navigate} />
+        </div>
+      )}
+      {page === 'forgot-password' && (
+        <div className="page-enter">
+          <ForgotPasswordPage onNavigate={navigate} />
+        </div>
+      )}
+      {page === 'home' && (
+        <>
+          <Hero onNavigate={navigate} />
+          <HomeModesScrollSection onNavigate={navigate} />
+          <UseCaseStorySection />
+          <WhySumalyzeSection />
+          <TrustSection />
+          <DemoSection onNavigate={navigate} onSignUpClick={() => setAuthOpen(true)} />
+        </>
+      )}
+
+      <Footer onNavigate={navigate} onFeedbackClick={() => setFeedbackOpen(true)} />
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onNavigate={navigate} />
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <CookieConsent />
+    </div>
   );
 }
 
@@ -188,8 +352,7 @@ export default function App() {
    HEADER — Clean nav: Home, Tools, Agent, More dropdown
    ============================================================ */
 
-function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
-  onLoginClick: () => void;
+function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
   onNavigate: (p: Page) => void;
   onNavigateTool: (slug: string) => void;
   onFeedbackClick: () => void;
@@ -230,7 +393,7 @@ function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, cur
     { label: 'Workflows',  page: 'workflows' },
     { label: 'Use Cases',  page: 'usecases' },
     { label: 'Feedback',   onClick: onFeedbackClick },
-    { label: 'Support',    href: 'https://ko-fi.com/sumalyze' },
+    { label: 'Support',    page: 'support' },
     { label: 'Privacy',    page: 'privacy' },
     { label: 'Terms',      page: 'terms' },
   ];
@@ -282,13 +445,15 @@ function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, cur
             {toolsOpen && (
               <div data-tools-dropdown style={{
                 position: 'absolute', top: 'calc(100% + 10px)', left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(12,4,20,0.98)',
-                border: '1px solid rgba(255,255,255,0.09)',
-                borderRadius: 16, padding: '16px',
-                minWidth: 560,
-                boxShadow: '0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(226,62,87,0.08)',
+                background: 'rgba(12,4,20,0.94)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 16, padding: '20px',
+                minWidth: 640,
+                boxShadow: '0 32px 80px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(226,62,87,0.05)',
                 zIndex: 200,
-                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
               }}>
                 {TOOLS.map(tool => (
                   <button key={tool.id}
@@ -382,26 +547,47 @@ function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, cur
         {/* Desktop actions */}
         <div className="header-nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: 10, zIndex: 2 }}>
           {user ? (
-            <button onClick={signOut} style={{
-              padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-              cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
-              background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)',
-              fontFamily: 'inherit',
-            }}>
-              Sign Out
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={() => onNavigate('settings')} style={{
+                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+                background: currentPage === 'settings' ? 'rgba(226,62,87,0.1)' : 'rgba(255,255,255,0.04)',
+                color: currentPage === 'settings' ? '#ff8fa3' : 'rgba(255,255,255,0.8)',
+                fontFamily: 'inherit',
+              }}>
+                Settings
+              </button>
+              <button onClick={() => { captureEvent('logout_clicked'); signOut(); }} style={{
+                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)',
+                fontFamily: 'inherit',
+              }}>
+                Sign Out
+              </button>
+            </div>
           ) : (
-            <button onClick={onLoginClick} style={{
-              padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-              cursor: 'pointer', border: '1px solid rgba(207,184,255,0.2)',
-              background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)',
-              boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)',
-              color: '#f4f0ff', fontFamily: 'inherit',
-            }}>
-              Sign In
-            </button>
+            <>
+              <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Sign In', location: 'Header', destination: 'login' }); onNavigate('login'); }} style={{
+                padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'rgba(255,255,255,0.8)', fontFamily: 'inherit',
+              }}>
+                Sign In
+              </button>
+              <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Sign Up', location: 'Header', destination: 'signup' }); onNavigate('signup'); }} style={{
+                padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', border: '1px solid rgba(207,184,255,0.2)',
+                background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)',
+                boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)',
+                color: '#f4f0ff', fontFamily: 'inherit',
+              }}>
+                Sign Up
+              </button>
+            </>
           )}
-          <HeaderBtn onClick={() => onNavigate('agent')}>Try Agent ✧</HeaderBtn>
+          <HeaderBtn onClick={() => { captureEvent('cta_clicked', { cta_name: 'Try Agent', location: 'Header', destination: 'agent' }); onNavigate('agent'); }}>Try Agent ✧</HeaderBtn>
         </div>
 
         {/* Mobile: hamburger */}
@@ -434,7 +620,10 @@ function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, cur
             { label: 'Home', page: 'home' as Page },
             { label: 'Agent', page: 'agent' as Page },
             { label: 'Pricing', page: 'pricing' as Page },
-            ...(user ? [{ label: 'History', page: 'history' as Page }] : []),
+            ...(user ? [
+              { label: 'History', page: 'history' as Page },
+              { label: 'Settings', page: 'settings' as Page }
+            ] : []),
             { label: 'Workflows', page: 'workflows' as Page },
             { label: 'Use Cases', page: 'usecases' as Page },
           ].map((l) => (
@@ -538,7 +727,7 @@ function Header({ onLoginClick, onNavigate, onNavigateTool, onFeedbackClick, cur
               Sign Out
             </button>
           ) : (
-            <button onClick={() => { onLoginClick(); setMobileMenuOpen(false); }} style={{
+            <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} style={{
               padding: '12px', borderRadius: 10, fontSize: 14, fontWeight: 500,
               cursor: 'pointer', border: 'none',
               background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
@@ -590,202 +779,23 @@ function HeaderBtn({ children, onClick }: { children: React.ReactNode; onClick?:
   );
 }
 
-/* ============================================================
-   HERO — Left-aligned content + Workspace Visualizer
-   ============================================================ */
-function WorkspaceVisualizer() {
-  const [pulseActive, setPulseActive] = useState(0);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPulseActive(prev => (prev + 1) % 3);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
-  return (
-    <div className="animate-reveal delay-300" style={{
-      position: 'relative',
-      maxWidth: 620,
-      width: '100%',
-      margin: '0 auto',
-      background: 'linear-gradient(135deg, rgba(20, 10, 30, 0.4) 0%, rgba(10, 5, 20, 0.6) 100%)',
-      border: '1px solid rgba(226, 62, 87, 0.18)',
-      borderRadius: 16,
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6), inset 0 0 20px rgba(226, 62, 87, 0.08)',
-      overflow: 'hidden',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-    }}>
-      {/* Window Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56' }} />
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f' }} />
-        </div>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>sumalyze_workspace_v1.2</span>
-        <div style={{ width: 38 }} />
-      </div>
 
-      {/* Workspace Content Panel */}
-      <div style={{ display: 'flex', minHeight: 280, position: 'relative' }} className="workspace-flex-layout">
-        <style>{`
-          @media(max-width: 540px) {
-            .workspace-flex-layout {
-              flex-direction: column !important;
-            }
-            .workspace-left-pane {
-              border-right: none !important;
-              border-bottom: 1px solid rgba(255,255,255,0.06) !important;
-            }
-          }
-        `}</style>
-        
-        {/* Left Side: Mock Text Editor */}
-        <div className="workspace-left-pane" style={{ flex: 1.2, padding: 18, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 8 }}>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', fontWeight: 600 }}>Input Document</span>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#E23E57', animation: 'premiumPulse 1.5s infinite' }} />
-          </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: '1.7', fontFamily: 'monospace' }}>
-            <p style={{ margin: '0 0 10px 0', padding: '4px', borderRadius: 4, background: pulseActive === 0 ? 'rgba(226, 62, 87, 0.12)' : 'transparent', transition: 'background 0.5s ease' }}>
-              <span style={{ color: pulseActive === 0 ? '#ff8fa3' : 'inherit' }}>I guess if you are too busy to respond, that is fine. I'll just wait here.</span>
-            </p>
-            <p style={{ margin: '0 0 10px 0', padding: '4px', borderRadius: 4, background: pulseActive === 1 ? 'rgba(129, 140, 248, 0.12)' : 'transparent', transition: 'background 0.5s ease' }}>
-              <span style={{ color: pulseActive === 1 ? '#a5b4fc' : 'inherit' }}>We absolutely need the final deliverables by Friday noon without fail.</span>
-            </p>
-            <p style={{ margin: 0, padding: '4px', borderRadius: 4, background: pulseActive === 2 ? 'rgba(52, 211, 153, 0.12)' : 'transparent', transition: 'background 0.5s ease' }}>
-              <span style={{ color: pulseActive === 2 ? '#6ee7b7' : 'inherit' }}>Let's hop on a call to iron out these launch details. Regards, Sarah.</span>
-            </p>
-            <span className="cursor-blink" />
-          </div>
-        </div>
-
-        {/* SVG Connector Lines */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2 }} className="workspace-connectors">
-          <style>{`
-            @media(max-width: 540px) {
-              .workspace-connectors {
-                display: none !important;
-              }
-            }
-          `}</style>
-          <svg style={{ width: '100%', height: '100%' }}>
-            {pulseActive === 0 && (
-              <path d="M 280,68 L 360,84" stroke="rgba(226, 62, 87, 0.5)" strokeWidth="1" fill="none" className="animate-dash-line" />
-            )}
-            {pulseActive === 1 && (
-              <path d="M 280,128 L 360,136" stroke="rgba(129, 140, 248, 0.5)" strokeWidth="1" fill="none" className="animate-dash-line" />
-            )}
-            {pulseActive === 2 && (
-              <path d="M 280,188 L 360,188" stroke="rgba(52, 211, 153, 0.5)" strokeWidth="1" fill="none" className="animate-dash-line" />
-            )}
-          </svg>
-        </div>
-
-        {/* Right Side: Analysis Engine */}
-        <div style={{ flex: 1, padding: 18, background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 8 }}>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', fontWeight: 600 }}>AI Intelligence</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, justifyContent: 'center' }}>
-            
-            {/* Tone Card */}
-            <div style={{
-              background: 'rgba(226, 62, 87, 0.04)',
-              border: '1px solid rgba(226, 62, 87, 0.15)',
-              borderRadius: 8, padding: '8px 12px',
-              transform: pulseActive === 0 ? 'scale(1.03)' : 'scale(1)',
-              opacity: pulseActive === 0 ? 1 : 0.4,
-              transition: 'all 0.5s ease',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 10, color: '#ff8fa3', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pulse (Tone)</span>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Detected</span>
-              </div>
-              <p style={{ fontSize: 11, fontWeight: 500, color: 'white' }}>Passive-Aggressive 🚨</p>
-            </div>
-
-            {/* Intent Card */}
-            <div style={{
-              background: 'rgba(129, 140, 248, 0.04)',
-              border: '1px solid rgba(129, 140, 248, 0.15)',
-              borderRadius: 8, padding: '8px 12px',
-              transform: pulseActive === 1 ? 'scale(1.03)' : 'scale(1)',
-              opacity: pulseActive === 1 ? 1 : 0.4,
-              transition: 'all 0.5s ease',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 10, color: '#a5b4fc', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Intent</span>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Decrypted</span>
-              </div>
-              <p style={{ fontSize: 11, fontWeight: 500, color: 'white' }}>Enforce Friday Deadline ◈</p>
-            </div>
-
-            {/* Smart Reply Card */}
-            <div style={{
-              background: 'rgba(52, 211, 153, 0.04)',
-              border: '1px solid rgba(52, 211, 153, 0.15)',
-              borderRadius: 8, padding: '8px 12px',
-              transform: pulseActive === 2 ? 'scale(1.03)' : 'scale(1)',
-              opacity: pulseActive === 2 ? 1 : 0.4,
-              transition: 'all 0.5s ease',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                <span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Smart Reply</span>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Drafted</span>
-              </div>
-              <p style={{ fontSize: 11, fontWeight: 500, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>"Let's sync up, Sarah. Free at..." ◷</p>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SparkleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M9 2 L10.8 6.2 L15.4 7 L11.6 9.8 L13 14.4 L9 12.2 L5 14.4 L6.4 9.8 L2.6 7 L7.2 6.2 Z" fill="url(#sg)" />
-      <defs>
-        <linearGradient id="sg" x1="2.6" y1="14.4" x2="15.4" y2="2" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#E23E57" />
-          <stop offset="1" stopColor="#ff8fa3" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
 
 function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const { user } = useAuth();
-  const scrollToDemo = () => {
-    const el = document.getElementById('demo');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
 
   return (
-    <section style={{ paddingTop: 'clamp(100px, 12vw, 160px)', paddingBottom: '140px', position: 'relative' }}>
+    <section style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', position: 'relative', boxSizing: 'border-box' }}>
       {/* Background radial glow */}
       <div style={{ position: 'absolute', top: -173, left: '50%', transform: 'translateX(-50%)', width: 1440, height: 900, background: 'radial-gradient(40% 60% at 50% 30%, rgba(226,62,87,0.06) 0%, rgba(10,0,15,0) 100%)', pointerEvents: 'none', zIndex: 1 }} />
 
-      <div style={{ position: 'relative', zIndex: 2, maxWidth: 1248, margin: '0 auto', padding: '0 20px' }}>
+      <div style={{ position: 'relative', zIndex: 2, maxWidth: 1248, width: '100%', margin: '0 auto', padding: '0 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '48px', alignItems: 'center' }}>
           
           {/* Left Column: Headline, copy, CTAs */}
           <div style={{ textAlign: 'left' }}>
-            {/* AI label — editorial, not a badge */}
-            <div className="animate-reveal" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <SparkleIcon />
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                AI Clarity Workspace
-              </span>
-            </div>
-
             {/* Title */}
             <h1 className="animate-reveal delay-75" style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(38px, 6vw, 64px)', lineHeight: '1.05', letterSpacing: '-0.03em', margin: '0 0 20px' }}>
               <span style={{ background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.75) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', display: 'block' }}>
@@ -798,42 +808,30 @@ function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
             {/* Subtitle */}
             <p className="animate-reveal delay-150" style={{ fontSize: 17, lineHeight: '28px', color: 'rgba(239,237,253,0.7)', margin: '0 0 36px', maxWidth: 480 }}>
-              Paste any text. Get the point, the tone, the signals, and the next move. Built for students, creators, founders, and teams drowning in text.
+              Paste the text. Skip the suffering. Get the point instantly.
             </p>
 
             {/* CTA Buttons */}
             <div className="animate-reveal delay-200 hero-buttons" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
-              {user ? (
-                <button onClick={() => onNavigate('tools')}
-                  className="hover-glow"
-                  style={{ padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.25)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.14)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.3)', backdropFilter: 'blur(8px)', fontFamily: 'inherit' }}>
-                  Open workspace
-                </button>
-              ) : (
-                <button onClick={() => onNavigate('agent')}
-                  className="hover-glow"
-                  style={{ padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.25)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.14)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.3)', backdropFilter: 'blur(8px)', fontFamily: 'inherit' }}>
-                  Try Agent Mode
-                </button>
-              )}
-              <button onClick={scrollToDemo}
+              <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Start for free', location: 'Hero', destination: user ? 'tools' : 'signup' }); if (user) onNavigate('tools'); else onNavigate('signup'); }}
+                className="hover-glow"
+                style={{ padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: '#f4f0ff', cursor: 'pointer', border: '1px solid rgba(207,184,255,0.25)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.14)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.3)', backdropFilter: 'blur(8px)', fontFamily: 'inherit' }}>
+                Start for free
+              </button>
+              <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Explore tools', location: 'Hero', destination: 'tools' }); onNavigate('tools'); }}
                 className="hover-glow"
                 style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 28px', borderRadius: 10, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(8px)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                Try Demo
+                Explore tools
               </button>
             </div>
 
-            <p className="animate-reveal delay-300" style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: 0, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <span>✓ 100% MVP Free</span>
-              <span>•</span>
-              <span>✓ No Sign-up Required</span>
-              <span>•</span>
-              <span>✓ Private & Secure</span>
+            <p className="animate-reveal delay-300" style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0, fontStyle: 'italic' }}>
+              Less blah. More aha.
             </p>
           </div>
 
           {/* Right Column: Visualizer */}
-          <WorkspaceVisualizer />
+          <HeroMockup />
 
         </div>
       </div>
@@ -841,189 +839,41 @@ function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
   );
 }
 
-/* ============================================================
-   FROM TOOL TO AGENT — 3-card section
-   ============================================================ */
-function FromToolToAgentSection({ onNavigate }: { onNavigate: (p: Page) => void }) {
-  const cards = [
-    {
-      icon: '◎',
-      label: 'Understand',
-      title: 'What does it actually say?',
-      desc: 'Summaries, tone detection, and intent analysis. Strip the noise and find the real message.',
-      color: '#818cf8',
-      tools: ['Summarizer', 'Tone Analyzer', 'Intent Detector'],
-    },
-    {
-      icon: '⚠',
-      label: 'Detect',
-      title: 'What are the risks?',
-      desc: 'Risk flags, red flags, manipulation patterns, urgency signals, and contract gotchas.',
-      color: '#fbbf24',
-      tools: ['Signals Detector', 'Contract Explainer'],
-    },
-    {
-      icon: '◷',
-      label: 'Act',
-      title: 'What should I do next?',
-      desc: 'Ready-to-send replies, action steps, rewrites, and briefings — customized to your situation.',
-      color: '#34d399',
-      tools: ['Reply Helper', 'Bullet Brief', 'Email Simplifier'],
-    },
-  ];
 
-  return (
-    <section style={{ padding: '140px 20px 120px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionTitle>One platform. Three modes of clarity.</SectionTitle>
-        <SectionDesc>Use a single tool when you know what you need. Run the Agent when you want everything at once.</SectionDesc>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginTop: 48 }}>
-          {cards.map((card) => (
-            <div key={card.label} className="hover-card" style={{
-              background: 'rgba(255,255,255,0.013)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 20, padding: '28px',
-              display: 'flex', flexDirection: 'column', gap: 16,
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${card.color}, transparent)` }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${card.color}15`, border: `1px solid ${card.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{card.icon}</div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: card.color, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{card.label}</span>
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, color: 'white', letterSpacing: '-0.01em' }}>{card.title}</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: '20px' }}>{card.desc}</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {card.tools.map(t => (
-                  <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: `${card.color}10`, color: card.color, border: `1px solid ${card.color}20` }}>{t}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* CTA row */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 40, flexWrap: 'wrap' }}>
-          <button onClick={() => onNavigate('tools')} style={{ padding: '11px 24px', borderRadius: 10, fontSize: 14, fontWeight: 500, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}>
-            Browse All Tools →
-          </button>
-          <button onClick={() => onNavigate('agent')} style={{ padding: '11px 24px', borderRadius: 10, fontSize: 14, fontWeight: 500, border: 'none', background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', color: 'white', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(226,62,87,0.3)' }}>
-            Try Agent Mode ✧
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   AUDIENCE SECTION — For students, creators, founders, etc.
-   ============================================================ */
-function AudienceSection() {
-  const [activeTab, setActiveTab] = useState<'students' | 'creators' | 'founders' | 'tldr'>('students');
-
-  const audiences = {
-    students: {
-      title: "Tackle reading workloads in seconds",
-      icon: "🎓",
-      problem: "Assigned a 30-page research paper or study guide for tomorrow morning?",
-      solution: "Sumalyze reads the paper instantly. It extracts core hypotheses, compiles action items, and generates a structured summary without losing critical context.",
-      metric: "Save ~2 hours per paper"
-    },
-    creators: {
-      title: "De-risk inbox feedback & sponsor requests",
-      icon: "✍️",
-      problem: "Unsure how to reply to a passive-aggressive email from a sponsor or manager?",
-      solution: "Decode the real emotional subtext (Pulse) and review instant AI reply options. Respond with absolute clarity while protecting your business deals.",
-      metric: "100% professional tone"
-    },
-    founders: {
-      title: "Read between the lines of contracts & deals",
-      icon: "💼",
-      problem: "Negotiating with investors, vendors, or competitors with dense documents?",
-      solution: "Spot hidden leverage, emotional cues, high-urgency timelines, and red flag signals before signing. Know what they are really asking.",
-      metric: "Flag risks in <2 seconds"
-    },
-    tldr: {
-      title: "Fast triaging for busy people",
-      icon: "⚡",
-      problem: "Flooded with newsletters, long articles, and social threads you don't have time for?",
-      solution: "Paste text chaos and receive a beautifully distilled, one-sentence briefing. Absorb information at 10x speed with zero fluff.",
-      metric: "90% reading time reduction"
-    }
-  };
-
-  return (
-    <section style={{ padding: '120px 20px 140px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <SectionTitle>Built for people who hate long text</SectionTitle>
-        <SectionDesc>Tailored intelligence modules customized for whatever you read and write daily.</SectionDesc>
-
-        {/* Tab Controls */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, margin: '40px 0 24px', flexWrap: 'wrap' }}>
-          {(Object.keys(audiences) as Array<keyof typeof audiences>).map(key => (
-            <button key={key} onClick={() => setActiveTab(key)} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 18px', borderRadius: 999, fontSize: 13, fontWeight: 500,
-              border: activeTab === key ? '1px solid rgba(226,62,87,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              background: activeTab === key ? 'rgba(226,62,87,0.1)' : 'rgba(255,255,255,0.02)',
-              color: activeTab === key ? '#ff8fa3' : 'rgba(255,255,255,0.5)',
-              transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}>
-              <span>{audiences[key].icon}</span>
-              <span>{key.charAt(0).toUpperCase() + key.slice(1).replace('tldr', 'TL;DR')}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Panel */}
-        <div className="hover-card audience-tab-panel" style={{
-          maxWidth: 800, margin: '0 auto',
-          background: 'rgba(255,255,255,0.015)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 20, padding: '36px',
-          display: 'flex', flexDirection: 'column', gap: 24,
-          position: 'relative', overflow: 'hidden'
-        }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(226, 62, 87, 0.2), transparent)' }} />
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#E23E57', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Use Case Study</span>
-              <h3 style={{ fontSize: 24, fontWeight: 500, color: 'white', marginTop: 6 }}>{audiences[activeTab].title}</h3>
-            </div>
-            <div style={{ background: 'rgba(226,62,87,0.08)', border: '1px solid rgba(226,62,87,0.15)', padding: '6px 12px', borderRadius: 8, fontSize: 12, color: '#ff8fa3', fontWeight: 500 }}>
-              {audiences[activeTab].metric}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24, marginTop: 8 }}>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>The Problem</p>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: '1.6' }}>"{audiences[activeTab].problem}"</p>
-            </div>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>The Workspace Solution</p>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: '1.6' }}>{audiences[activeTab].solution}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /* ============================================================
    DEMO SECTION
    ============================================================ */
-function DemoSection() {
+function DemoSection({ onNavigate, onSignUpClick }: { onNavigate: (p: Page) => void; onSignUpClick: () => void }) {
+  const { user } = useAuth();
   return (
-    <section id="features" style={{ padding: '140px 20px', background: 'rgba(10,0,15,0.3)' }}>
-      <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <DemoPanel />
+    <section id="features" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 20px', background: 'rgba(10,0,15,0.3)', boxSizing: 'border-box' }}>
+      <div style={{ maxWidth: 760, width: '100%', margin: '0 auto' }}>
+        <DemoPanel onSignUpClick={onSignUpClick} />
+
+        {/* CTA Buttons */}
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 40, flexWrap: 'wrap' }}>
+          <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Try Sumalyze free', location: 'Demo', destination: user ? 'tools' : 'signup' }); if (user) onNavigate('tools'); else onNavigate('signup'); }}
+            className="hover-glow"
+            style={{
+              padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: '#f4f0ff',
+              border: '1px solid rgba(207,184,255,0.2)',
+              background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)',
+              boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)', backdropFilter: 'blur(8px)',
+              cursor: 'pointer', fontFamily: 'inherit'
+            }}>
+            Try Sumalyze free
+          </button>
+          <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'View all tools', location: 'Demo', destination: 'tools' }); onNavigate('tools'); }}
+            className="hover-glow"
+            style={{
+              padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.65)',
+              border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(8px)',
+              cursor: 'pointer', fontFamily: 'inherit'
+            }}>
+            View all tools
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -1047,8 +897,9 @@ function _incrementUsage() {
   } catch {}
 }
 
-function DemoPanel() {
+function DemoPanel({ onSignUpClick }: { onSignUpClick: () => void }) {
   const { user } = useAuth();
+  const { plan } = useCurrentPlan();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -1061,6 +912,10 @@ function DemoPanel() {
   const isLimitReached = !user && usageCount >= GUEST_DAILY_LIMIT;
 
   const analyze = async () => {
+    if (!user) {
+      onSignUpClick();
+      return;
+    }
     if (!text.trim()) return;
     if (text.trim().length < 10) {
       setError('Please enter at least 10 characters to analyze.');
@@ -1120,6 +975,20 @@ function DemoPanel() {
 
 
   const handleFileUpload = async (file: File) => {
+    if (!user) {
+      onSignUpClick();
+      return;
+    }
+    const limitMB = getFileUploadLimitMB(plan);
+    if (file.size > limitMB * 1024 * 1024) {
+      setError(`File is too large. Your plan limit is ${limitMB} MB. Please upgrade to upload larger files.`);
+      captureEvent('feature_locked_clicked', {
+        feature: 'file_upload',
+        required_plan: limitMB === 2 ? 'starter' : limitMB === 10 ? 'pro' : limitMB === 25 ? 'max' : 'team',
+        current_plan: plan,
+      });
+      return;
+    }
     setParsing(true);
     setError(null);
     setUploadedFileName(null);
@@ -1144,11 +1013,15 @@ function DemoPanel() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    if (!user) {
+      onSignUpClick();
+      return;
+    }
     const file = e.dataTransfer.files[0];
     if (file) handleFileUpload(file);
   };
 
-  const canAnalyze = text.trim().length >= 10 && text.trim().length <= MAX_TEXT && !loading && !isLimitReached;
+  const canAnalyze = !user || (text.trim().length >= 10 && text.trim().length <= MAX_TEXT && !loading && !isLimitReached);
 
   return (
     <div id="demo" style={{ marginTop: 20 }}>
@@ -1156,103 +1029,111 @@ function DemoPanel() {
       <SectionDesc>Experience the live parsing engine. Paste your own chaotic text or upload a document below.</SectionDesc>
 
       {/* Main Demo Panel */}
-      <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', marginTop: 48 }}>
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-          {(['paste', 'upload'] as const).map(t => (
-            <button key={t} onClick={() => { setTab(t); setError(null); }}
-              style={{ padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: tab === t ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent', background: tab === t ? 'rgba(226,62,87,0.1)' : 'transparent', color: tab === t ? '#ff8fa3' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }}>
-              {t === 'paste' ? '📋 Paste Text' : '📎 Upload File'}
-            </button>
-          ))}
-          {(text || uploadedFileName) && (
-            <button onClick={() => { setText(''); setResult(null); setError(null); setUploadedFileName(null); }} style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
-          )}
-        </div>
+      <DemoRevealSection>
+        <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', marginTop: 48 }}>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+            {(['paste', 'upload'] as const).map(t => (
+              <button key={t} onClick={() => { if (!user) { onSignUpClick(); } else { setTab(t); setError(null); } }}
+                style={{ padding: '7px 16px', borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: tab === t ? '1px solid rgba(226,62,87,0.3)' : '1px solid transparent', background: tab === t ? 'rgba(226,62,87,0.1)' : 'transparent', color: tab === t ? '#ff8fa3' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }}>
+                {t === 'paste' ? '📋 Paste Text' : '📎 Upload File'}
+              </button>
+            ))}
+            {(text || uploadedFileName) && (
+              <button onClick={() => { setText(''); setResult(null); setError(null); setUploadedFileName(null); }} style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
+            )}
+          </div>
 
-        <div style={{ padding: '20px' }}>
-          {tab === 'paste' ? (
-            <div style={{ position: 'relative' }}>
-              {uploadedFileName && (
-                <div style={{ marginBottom: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 12, color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  📄 {uploadedFileName} · {text.length.toLocaleString()} characters loaded
+          <div style={{ padding: '20px' }}>
+            {tab === 'paste' ? (
+              <div style={{ position: 'relative' }}>
+                {uploadedFileName && (
+                  <div style={{ marginBottom: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 12, color: '#6ee7b7', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    📄 {uploadedFileName} · {text.length.toLocaleString()} characters loaded
+                  </div>
+                )}
+                <textarea value={text} onChange={e => { setText(e.target.value); setError(null); }}
+                  placeholder="Paste an email, message, contract snippet, or any text you want to analyze..."
+                  style={{ width: '100%', height: 180, background: 'rgba(10,0,15,0.6)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 16, fontSize: 14, color: 'rgba(255,255,255,0.8)', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: '22px', boxSizing: 'border-box' }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(226,62,87,0.3)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                  <span style={{ fontSize: 11, color: text.length > MAX_TEXT ? '#fca5a5' : text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
+                    {text.length.toLocaleString()} / {MAX_TEXT.toLocaleString()}{text.length > 0 && text.length < 10 ? ' · min 10' : text.length > MAX_TEXT ? ' · too long' : ''}
+                  </span>
                 </div>
-              )}
-              <textarea value={text} onChange={e => { setText(e.target.value); setError(null); }}
-                placeholder="Paste an email, message, contract snippet, or any text you want to analyze..."
-                style={{ width: '100%', height: 180, background: 'rgba(10,0,15,0.6)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 16, fontSize: 14, color: 'rgba(255,255,255,0.8)', resize: 'none', outline: 'none', fontFamily: 'inherit', lineHeight: '22px', boxSizing: 'border-box' }}
-                onFocus={e => e.target.style.borderColor = 'rgba(226,62,87,0.3)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.07)'}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                <span style={{ fontSize: 11, color: text.length > MAX_TEXT ? '#fca5a5' : text.length < 10 && text.length > 0 ? '#fca5a5' : 'rgba(255,255,255,0.2)' }}>
-                  {text.length.toLocaleString()} / {MAX_TEXT.toLocaleString()}{text.length > 0 && text.length < 10 ? ' · min 10' : text.length > MAX_TEXT ? ' · too long' : ''}
-                </span>
               </div>
-            </div>
-          ) : (
-            <div
-              onDrop={handleDrop}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => { if (!parsing) fileInputRef.current?.click(); }}
-              style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: parsing ? 'not-allowed' : 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
-              onMouseEnter={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'; }}
-              onMouseLeave={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}
-            >
-              {parsing ? (
-                <>
-                  <span style={{ fontSize: 24, animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⏳</span>
-                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Parsing document...</p>
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Extracting text content locally...</p>
-                </>
-              ) : (
-                <>
-                  <span style={{ fontSize: 32 }}>📄</span>
-                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop document here or click to browse</p>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>PDF, DOCX, TXT supported · Max 5MB</p>
-                </>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
-              />
-            </div>
-          )}
+            ) : (
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => e.preventDefault()}
+                onClick={() => {
+                  if (!user) {
+                    onSignUpClick();
+                    return;
+                  }
+                  if (!parsing) fileInputRef.current?.click();
+                }}
+                style={{ height: 180, border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: parsing ? 'not-allowed' : 'pointer', background: 'rgba(10,0,15,0.4)', transition: 'border-color 0.2s' }}
+                onMouseEnter={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226,62,87,0.3)'; }}
+                onMouseLeave={e => { if (!parsing) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}
+              >
+                {parsing ? (
+                  <>
+                    <span style={{ fontSize: 24, animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⏳</span>
+                    <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Parsing document...</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Extracting text content locally...</p>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 32 }}>📄</span>
+                    <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Drop document here or click to browse</p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>PDF, DOCX, TXT supported · Max {getFileUploadLimitMB(plan)}MB</p>
+                  </>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+                />
+              </div>
+            )}
 
-          {/* Error message */}
-          {error && (
-            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 8 }}>
-              ⚠ {error}
-            </div>
-          )}
+            {/* Error message */}
+            {error && (
+              <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 8 }}>
+                ⚠ {error}
+              </div>
+            )}
 
-          {isLimitReached && (
-            <div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', fontSize: 13, color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span>Daily MVP free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for unlimited access.</span>
-            </div>
-          )}
-          <button onClick={analyze} disabled={!canAnalyze}
-            style={{
-              width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500,
-              cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none',
-              background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
-              color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white',
-              boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
-              transition: 'all 0.25s', fontFamily: 'inherit',
-              animation: loading ? 'premiumPulse 1.5s ease-in-out infinite' : 'none'
-            }}>
-            {loading ? '⏳ Analyzing with AI...' : '⚡ Analyze with Sumalyze'}
-          </button>
+            {isLimitReached && (
+              <div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', fontSize: 13, color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <span>Daily MVP free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for unlimited access.</span>
+              </div>
+            )}
+            <button onClick={analyze} disabled={!canAnalyze}
+              style={{
+                width: '100%', marginTop: 14, padding: '14px', borderRadius: 14, fontSize: 15, fontWeight: 500,
+                cursor: !canAnalyze ? 'not-allowed' : 'pointer', border: 'none',
+                background: !canAnalyze ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
+                color: !canAnalyze ? 'rgba(255,255,255,0.25)' : 'white',
+                boxShadow: !canAnalyze ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
+                transition: 'all 0.25s', fontFamily: 'inherit',
+                animation: loading ? 'premiumPulse 1.5s ease-in-out infinite' : 'none'
+              }}>
+              {loading ? '⏳ Analyzing with AI...' : user ? '⚡ Analyze with Sumalyze' : '⚡ Try Sumalyze free'}
+            </button>
+          </div>
+
+          {/* Results */}
+          {result && <ResultGrid result={result} />}
+          {result && <FeedbackWidget key={result.brief} />}
+          {result && <ResultKoFiCTA />}
         </div>
-
-        {/* Results */}
-        {result && <ResultGrid result={result} />}
-        {result && <FeedbackWidget key={result.brief} />}
-        {result && <ResultKoFiCTA />}
-      </div>
+      </DemoRevealSection>
     </div>
   );
 }
@@ -1427,37 +1308,7 @@ function ResultGrid({ result }: { result: AnalysisResult }) {
   );
 }
 
-/* ============================================================
-   FINAL CTA
-   ============================================================ */
-function FinalCTA({ onNavigate }: { onNavigate: (p: Page) => void }) {
-  return (
-    <section style={{ padding: '140px 20px 160px', textAlign: 'center', position: 'relative' }}>
-      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 800, height: 400, background: 'radial-gradient(ellipse, rgba(226,62,87,0.08) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 600, margin: '0 auto' }}>
-        <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: '1.1', letterSpacing: '-0.03em', margin: '0 0 20px' }}>
-          <span style={{ background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', display: 'block' }}>
-            Start understanding
-          </span>
-          <span style={{ background: 'linear-gradient(180deg, #ff8fa3 0%, #E23E57 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', display: 'block' }}>
-            every message.
-          </span>
-        </h2>
-        <p style={{ fontSize: 18, color: 'rgba(239,237,253,0.65)', lineHeight: '28px', marginBottom: 40 }}>
-          MVP Free. No account required. Just paste and analyze.
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => onNavigate('agent')} style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: '#f4f0ff', border: '1px solid rgba(207,184,255,0.2)', background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)', boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)', backdropFilter: 'blur(8px)', cursor: 'pointer', fontFamily: 'inherit' }}>
-            Try Agent Mode
-          </button>
-          <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ padding: '14px 28px', borderRadius: 12, fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
-            ♥ Support on Ko-fi
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
+
 
 /* ============================================================
    FOOTER
@@ -1503,7 +1354,12 @@ function Footer({ onNavigate, onFeedbackClick }: { onNavigate: (page: Page) => v
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
                 Submit Feedback
               </button>
-              <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 14, color: '#ff8fa3', textDecoration: 'none', transition: 'color 0.2s', fontWeight: 500, marginBottom: 10 }}
+              <button onClick={() => onNavigate('support')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Contact / Support
+              </button>
+              <a href="https://ko-fi.com/sumalyze" target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: 14, color: '#ff8fa3', textDecoration: 'none', transition: 'color 0.2s', fontWeight: 500 }}
                 onMouseEnter={e => e.currentTarget.style.color = '#ffb3c1'}
                 onMouseLeave={e => e.currentTarget.style.color = '#ff8fa3'}>
                 ♥ Support on Ko-fi
@@ -1517,10 +1373,30 @@ function Footer({ onNavigate, onFeedbackClick }: { onNavigate: (page: Page) => v
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
                 Privacy Policy
               </button>
-              <button onClick={() => onNavigate('terms')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+              <button onClick={() => onNavigate('terms')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
                 onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
                 Terms of Service
+              </button>
+              <button onClick={() => onNavigate('cookies')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Cookie Policy
+              </button>
+              <button onClick={() => onNavigate('refund')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Refund Policy
+              </button>
+              <button onClick={() => onNavigate('billing')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 10, padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Billing Terms
+              </button>
+              <button onClick={() => onNavigate('data-deletion')} style={{ display: 'block', fontSize: 14, color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textAlign: 'left', transition: 'color 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.85)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
+                Data Deletion
               </button>
             </div>
           </div>

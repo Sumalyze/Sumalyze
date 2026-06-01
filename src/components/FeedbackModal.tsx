@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { saveUserFeedback } from '../services/database';
+import { useAuth } from '../hooks/useAuth';
 import sumalyzeLogo from '../assets/sumalyzelogo.png';
+import { captureEvent } from '../lib/analytics';
+import TurnstileWidget from './TurnstileWidget';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -10,6 +13,7 @@ interface FeedbackModalProps {
 type FeedbackType = 'bug' | 'suggestion' | 'other';
 
 export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
+  const { user } = useAuth();
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('suggestion');
   const [message, setMessage] = useState('');
   const [rating, setRating] = useState<number | null>(null);
@@ -17,6 +21,17 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileKey, setTurnstileKey] = useState(0);
+
+  const isTurnstileRequired = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const canSubmit = message.trim().length > 0 && (!isTurnstileRequired || !!turnstileToken) && !loading;
+
+  useEffect(() => {
+    if (isOpen) {
+      captureEvent('feedback_modal_opened');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -44,16 +59,53 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
     setLoading(true);
     try {
+      // 1. Save to Supabase database (client-side)
       const { error: dbError } = await saveUserFeedback(feedbackType, trimmedMessage, rating);
       if (dbError) {
-        setError(dbError.message || 'Could not save your feedback. Please try again.');
-      } else {
-        setSuccess('Thank you! Your feedback has been submitted successfully.');
-        setMessage('');
-        setRating(null);
+        console.warn('[FeedbackModal] Supabase save failed:', dbError);
       }
-    } catch {
-      setError('Something went wrong. Please try again.');
+
+      // 2. Capitalize category for Netlify validation
+      const capitalizedCategory = feedbackType.charAt(0).toUpperCase() + feedbackType.slice(1);
+
+      // 3. POST data to the transactional email endpoint
+      const response = await fetch('/api/send-feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-turnstile-token': turnstileToken || '',
+        },
+        body: JSON.stringify({
+          category: capitalizedCategory,
+          message: trimmedMessage,
+          rating: rating || undefined,
+          userEmail: user?.email || undefined,
+          pageUrl: window.location.href,
+          userAgent: navigator.userAgent,
+          turnstileToken: turnstileToken || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Server failed to send feedback notification email.');
+      }
+
+      captureEvent('feedback_submitted', {
+        category: feedbackType,
+        has_rating: rating !== null,
+        rating: rating || undefined,
+        is_authenticated: !!user,
+      });
+
+      setSuccess('Thank you! Your feedback has been submitted successfully.');
+      setMessage('');
+      setRating(null);
+      setTurnstileToken(null);
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setTurnstileToken(null);
+      setTurnstileKey(prev => prev + 1);
     } finally {
       setLoading(false);
     }
@@ -277,23 +329,33 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               </div>
             )}
 
+            {/* Cloudflare Turnstile Verification */}
+            {isTurnstileRequired && (
+              <TurnstileWidget
+                key={turnstileKey}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+              />
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={!canSubmit}
               style={{
                 marginTop: 4,
                 padding: '13px',
                 borderRadius: 11,
                 fontSize: 14,
                 fontWeight: 500,
-                cursor: loading ? 'not-allowed' : 'pointer',
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
                 border: 'none',
-                background: loading
+                background: !canSubmit
                   ? 'rgba(255,255,255,0.05)'
                   : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
-                color: loading ? 'rgba(255,255,255,0.25)' : 'white',
-                boxShadow: loading ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
+                color: !canSubmit ? 'rgba(255,255,255,0.25)' : 'white',
+                boxShadow: !canSubmit ? 'none' : '0 4px 24px rgba(226,62,87,0.35)',
                 transition: 'all 0.25s',
               }}
             >

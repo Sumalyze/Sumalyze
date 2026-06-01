@@ -2,7 +2,7 @@
 // Shared reusable panel for running a single Sumalyze AI tool.
 // Used by both ToolsPage (grid) and ToolDetailPage (full-page).
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { ToolDef } from '../data/tools';
 import { runSingleTool, type ToolResult } from '../services/ai';
 import { isLimitReached, incrementUsage, getRemainingUses, incrementServerUsage } from '../services/limits';
@@ -10,6 +10,9 @@ import { useAuth } from '../hooks/useAuth';
 import { saveAnalysisHistory, saveOutput } from '../services/database';
 import { useToast } from './Toast';
 import DocumentUpload from './DocumentUpload';
+import { captureEvent, getInputLengthBucket, getFileSizeBucket, getDurationBucket } from '../lib/analytics';
+import ExportDropdown from './ExportDropdown';
+import { useCurrentPlan } from '../hooks/useCurrentPlan';
 
 /* ─── Micro-components ──────────────────────────────────── */
 
@@ -26,12 +29,17 @@ function Badge({ children, color }: { children: React.ReactNode; color: string }
   );
 }
 
-export function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text, toolName }: { text: string; toolName?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      captureEvent('export_clicked', {
+        format: 'clipboard',
+        tool_name: toolName || 'unknown',
+        plan: 'free',
+      });
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
@@ -47,7 +55,7 @@ export function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function SaveOutputButton({ title, content, type }: { title: string; content: string; type: string }) {
+export function SaveOutputButton({ title, content, type, toolName }: { title: string; content: string; type: string; toolName?: string }) {
   const { user } = useAuth();
   const toast = useToast();
   const [saved, setSaved] = useState(false);
@@ -60,6 +68,11 @@ export function SaveOutputButton({ title, content, type }: { title: string; cont
       const { error } = await saveOutput(title, content, type);
       if (error) throw error;
       setSaved(true);
+      captureEvent('export_clicked', {
+        format: 'database',
+        tool_name: toolName || title,
+        plan: 'free',
+      });
       toast.success('Clarity report saved successfully!');
       setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
@@ -100,11 +113,20 @@ export default function ToolPanel({ tool, isLoggedIn, hideHeader = false, onResu
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedFileMeta, setUploadedFileMeta] = useState<{ type: string; size: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const limited = isLimitReached('tools', isLoggedIn);
-  const remaining = getRemainingUses('tools', isLoggedIn);
+  const { plan } = useCurrentPlan();
+  const limited = isLimitReached('tools', isLoggedIn, plan);
+  const remaining = getRemainingUses('tools', isLoggedIn, plan);
   const canRun = text.trim().length >= 10 && !loading && !limited;
+
+  useEffect(() => {
+    captureEvent('tool_opened', {
+      tool_name: tool.name,
+      source_page: window.location.pathname === '/tools' ? 'Tools Directory' : 'Direct Link',
+    });
+  }, [tool.id, tool.name]);
 
   const run = useCallback(async () => {
     if (!canRun) return;
@@ -113,10 +135,28 @@ export default function ToolPanel({ tool, isLoggedIn, hideHeader = false, onResu
     setLoading(true);
     setResult(null);
     setError(null);
+
+    const startTime = performance.now();
+    captureEvent('analysis_started', {
+      tool_name: tool.name,
+      input_length_bucket: getInputLengthBucket(text.length),
+      file_type: inputType === 'file' ? uploadedFileMeta?.type : undefined,
+      file_size_bucket: inputType === 'file' && uploadedFileMeta?.size !== undefined ? getFileSizeBucket(uploadedFileMeta.size) : undefined,
+      is_guest: !isLoggedIn,
+      plan: plan,
+    });
+
     try {
       const res = await runSingleTool(tool.id, text, abortRef.current.signal);
       setResult(res);
       onResult?.(res);
+
+      const durationMs = performance.now() - startTime;
+      captureEvent('analysis_completed', {
+        tool_name: tool.name,
+        duration_bucket: getDurationBucket(durationMs),
+        success: true,
+      });
 
       if (isLoggedIn) {
         await incrementServerUsage('increment_tool');
@@ -125,13 +165,20 @@ export default function ToolPanel({ tool, isLoggedIn, hideHeader = false, onResu
         incrementUsage('tools', false);
       }
     } catch (e) {
+      const durationMs = performance.now() - startTime;
       if (e instanceof Error && e.message !== 'Tool run cancelled') {
         setError(e.message || 'Analysis failed. Please try again.');
+        captureEvent('analysis_failed', {
+          tool_name: tool.name,
+          error_type: e.message || 'unknown_error',
+          duration_bucket: getDurationBucket(durationMs),
+          success: false,
+        });
       }
     } finally {
       setLoading(false);
     }
-  }, [canRun, text, tool.id, isLoggedIn, onResult]);
+  }, [canRun, text, tool.id, tool.name, isLoggedIn, onResult, inputType, uploadedFileMeta]);
 
   const loadPreset = () => {
     setText(tool.exampleText);
@@ -251,9 +298,15 @@ export default function ToolPanel({ tool, isLoggedIn, hideHeader = false, onResu
         ) : (
           <DocumentUpload
             accentColor={tool.accent}
-            onTextExtracted={(extractedText) => {
+            onTextExtracted={(extractedText, fileName, file) => {
               setText(extractedText);
               setError(null);
+              if (file) {
+                const ext = fileName?.split('.').pop()?.toLowerCase() || 'unknown';
+                setUploadedFileMeta({ type: ext, size: file.size });
+              } else {
+                setUploadedFileMeta(null);
+              }
             }}
             onError={(err) => setError(err)}
           />
@@ -315,9 +368,9 @@ export default function ToolPanel({ tool, isLoggedIn, hideHeader = false, onResu
               </span>
               {result._mock && <Badge color="#6B7280">Preview</Badge>}
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <SaveOutputButton title={tool.name} content={result.output} type={tool.id} />
-              <CopyButton text={result.output} />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <SaveOutputButton title={tool.name} content={result.output} type={tool.id} toolName={tool.name} />
+              <ExportDropdown content={result.output} toolName={tool.name} />
             </div>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: '20px', whiteSpace: 'pre-line', margin: 0 }}>

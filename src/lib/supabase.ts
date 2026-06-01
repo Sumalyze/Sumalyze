@@ -3,10 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+// Helper to check if Supabase is configured
+const isConfigured = 
+  !!supabaseUrl && 
+  supabaseUrl !== 'https://placeholder.supabase.co' && 
+  supabaseUrl.trim() !== '' &&
+  !!supabaseAnonKey &&
+  supabaseAnonKey !== 'placeholder-anon-key' &&
+  supabaseAnonKey.trim() !== '';
+
+if (import.meta.env.DEV && !isConfigured) {
   console.warn(
-    '[Sumalyze] Supabase env vars not set. Auth will not work until you add ' +
-    'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.'
+    '[Sumalyze] Development Warning: Supabase client is not fully configured. ' +
+    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your local .env or .env.local file.'
   );
 }
 
@@ -16,3 +25,4 @@ export const supabase = createClient(
 );
 
 export type { User, Session } from '@supabase/supabase-js';
+

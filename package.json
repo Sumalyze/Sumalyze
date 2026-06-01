@@ -12,7 +12,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
+    "docx": "^9.7.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.344.0",
+    "posthog-js": "^1.376.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

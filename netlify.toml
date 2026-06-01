@@ -22,6 +22,16 @@
   to     = "/.netlify/functions/ai-analyze"
   status = 200
 
+[[redirects]]
+  from   = "/api/send-feedback"
+  to     = "/.netlify/functions/send-feedback"
+  status = 200
+
+[[redirects]]
+  from   = "/api/send-team-waitlist"
+  to     = "/.netlify/functions/send-team-waitlist"
+  status = 200
+
 # ── SPA fallback — all routes serve index.html ─────────────────────────────
 [[redirects]]
   from   = "/*"
