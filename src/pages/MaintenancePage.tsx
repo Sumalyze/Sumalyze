@@ -9,6 +9,24 @@ import sumalyzeLogo from '../assets/sumalyzelogo.png';
 export default function MaintenancePage() {
   const [pulse, setPulse] = useState(0);
   const [flowOffset, setFlowOffset] = useState(0);
+  const [linksOpen, setLinksOpen] = useState(false);
+
+  const navigateTo = (path: string) => {
+    window.history.pushState(null, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const verificationLinks = [
+    { label: 'Pricing', path: '/pricing' },
+    { label: 'Team Workspace', path: '/team-workspace' },
+    { label: 'Privacy Policy', path: '/privacy' },
+    { label: 'Terms of Service', path: '/terms' },
+    { label: 'Cookie Policy', path: '/cookies' },
+    { label: 'Refund Policy', path: '/refund' },
+    { label: 'Billing Terms', path: '/billing' },
+    { label: 'Data Deletion', path: '/data-deletion' },
+    { label: 'Support', path: '/support' },
+  ];
 
   // Subtle animated flow along the cable line
   useEffect(() => {
@@ -149,9 +167,101 @@ export default function MaintenancePage() {
           fontSize: 13,
           color: 'rgba(255,255,255,0.25)',
           letterSpacing: '0.02em',
+          marginBottom: 16
         }}>
           Thanks for your patience.
         </p>
+
+        {/* Verification Links Dropdown */}
+        <div className="animate-reveal delay-500" style={{ marginTop: 24, width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button
+            onClick={() => setLinksOpen(!linksOpen)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 12,
+              padding: '10px 18px',
+              width: '100%',
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontFamily: 'inherit',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+            }}
+          >
+            <span>Policies & verification links</span>
+            <span style={{
+              transform: linksOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              display: 'inline-block',
+              fontSize: 10,
+              marginLeft: 8
+            }}>▼</span>
+          </button>
+          
+          {linksOpen && (
+            <div style={{
+              background: 'rgba(10, 0, 15, 0.8)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: 12,
+              padding: '6px',
+              marginTop: 8,
+              width: '100%',
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+              gap: 2,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+              animation: 'maint-fade-in 0.25s ease-out forwards',
+              maxHeight: 280,
+              overflowY: 'auto'
+            }}>
+              {verificationLinks.map((link, idx) => (
+                <a
+                  key={idx}
+                  href={link.path}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigateTo(link.path);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: 'rgba(255, 255, 255, 0.55)',
+                    textDecoration: 'none',
+                    textAlign: 'left',
+                    transition: 'all 0.2s',
+                    fontFamily: 'inherit',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(226, 62, 87, 0.08)';
+                    e.currentTarget.style.color = '#ff8fa3';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.55)';
+                  }}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
 
       </div>
 
@@ -175,6 +285,10 @@ export default function MaintenancePage() {
         }
         @keyframes maint-dash {
           to { stroke-dashoffset: -30; }
+        }
+        @keyframes maint-fade-in {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>

@@ -224,7 +224,7 @@ function AppContent() {
   };
 
   const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
-  const isProtectedRoute = ['tools', 'tooldetail', 'agent', 'workflows', 'history', 'settings', 'login', 'signup', 'forgot-password'].includes(page);
+  const isProtectedRoute = ['home', 'tools', 'tooldetail', 'agent', 'workflows', 'history', 'settings', 'login', 'signup', 'forgot-password'].includes(page);
 
   if (isMaintenanceMode && isProtectedRoute) {
     return <MaintenancePage />;
