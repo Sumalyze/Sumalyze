@@ -39,7 +39,7 @@ export default function HeroMockup() {
   }, [loadingStep]);
 
   return (
-    <div className="animate-reveal delay-300" style={{
+    <div className="animate-reveal delay-300 restore-fonts" style={{
       position: 'relative',
       maxWidth: 620,
       width: '100%',

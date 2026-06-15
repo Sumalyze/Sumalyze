@@ -180,14 +180,16 @@ export function isLimitReached(feature: LimitFeature, isLoggedIn: boolean, plan:
     // Guest is on Free plan
     if (feature === 'agent') return true;
     
-    // Free plan allows up to 3 analyses/day total (demo + tools)
+    // Guest allows up to 3 analyses/day total (demo + tools)
     const demoUsage = getGuestUsageToday('demo');
     const toolsUsage = getGuestUsageToday('tools');
     const totalGuestUsage = demoUsage + toolsUsage;
     
-    return totalGuestUsage >= 3;
+    return totalGuestUsage >= GUEST_DAILY_LIMIT;
   }
 }
+
+export const GUEST_DAILY_LIMIT = 3;
 
 export function getRemainingUses(feature: LimitFeature, isLoggedIn: boolean, plan: string = 'free'): number {
   const p = plan.toLowerCase();
@@ -224,6 +226,6 @@ export function getRemainingUses(feature: LimitFeature, isLoggedIn: boolean, pla
     const toolsUsage = getGuestUsageToday('tools');
     const totalGuestUsage = demoUsage + toolsUsage;
     
-    return Math.max(0, 3 - totalGuestUsage);
+    return Math.max(0, GUEST_DAILY_LIMIT - totalGuestUsage);
   }
 }

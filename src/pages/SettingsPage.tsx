@@ -13,7 +13,7 @@ interface SettingsPageProps {
 type SettingsTab = 'profile' | 'security' | 'subscription' | 'danger';
 
 export default function SettingsPage({ onNavigate }: SettingsPageProps) {
-  const { user, resetPassword } = useAuth();
+  const { user, resetPassword, signOut } = useAuth();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   
@@ -33,6 +33,12 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
   const [resetLoading, setResetLoading] = useState<boolean>(false);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
+
+  // Account deletion states
+  const [deleteInput, setDeleteInput] = useState<string>('');
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
   // Danger zone modal state
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
@@ -130,17 +136,73 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
     try {
       const { error } = await resetPassword(user.email);
       if (error) {
-        setResetError(error.message || 'Failed to send password reset email.');
+        setResetError('Could not send reset email. Please try again.');
         toast.error('Password reset request failed.');
       } else {
-        setResetSuccess('Password reset link sent! Please check your inbox.');
+        setResetSuccess('Password reset email sent. Check your inbox.');
         toast.success('Reset link sent successfully.');
       }
     } catch (err: any) {
-      setResetError(err.message || 'An unexpected error occurred.');
+      setResetError('Could not send reset email. Please try again.');
       toast.error('Password reset request failed.');
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const openDeleteModal = () => {
+    setDeleteInput('');
+    setDeleteError(null);
+    setDeleteSuccess(null);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteInput !== 'DELETE') {
+      setDeleteError('Please type DELETE to confirm.');
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+    setDeleteSuccess(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Authentication session not found. Please log in again.');
+      }
+
+      const response = await fetch('/api/request-account-deletion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to request account deletion.');
+      }
+
+      captureEvent('account_deletion_requested');
+      setDeleteSuccess('Account scheduled for deletion. Logging out...');
+      toast.success('Account deletion requested.');
+
+      setTimeout(async () => {
+        setDeleteConfirmOpen(false);
+        await signOut();
+        window.location.href = '/';
+      }, 3000);
+
+    } catch (err: any) {
+      setDeleteError(err.message || 'Could not request account deletion. Please try again.');
+      toast.error('Account deletion request failed.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -411,9 +473,22 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
                 Request a password change link via email.
               </p>
 
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: '22px', marginBottom: 24 }}>
-                For account protection, password updates are processed through a secure verification link sent to your registered email address.
-              </p>
+              <div style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 12,
+                padding: '20px',
+                marginBottom: 24,
+              }}>
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: '22px', margin: '0 0 12px 0' }}>
+                  We’ll send a secure password reset link to your account email.
+                </p>
+                {user?.email && (
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', margin: 0 }}>
+                    Reset link will be sent to: <strong style={{ color: 'white', fontWeight: 500 }}>{user.email}</strong>
+                  </p>
+                )}
+              </div>
 
               {resetError && (
                 <div style={{
@@ -443,19 +518,19 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
 
               <button
                 onClick={handleTriggerPasswordReset}
-                disabled={resetLoading}
+                disabled={resetLoading || !user?.email}
                 style={{
                   padding: '10px 20px',
                   borderRadius: 10,
                   fontSize: 13,
                   fontWeight: 500,
-                  cursor: resetLoading ? 'not-allowed' : 'pointer',
+                  cursor: (resetLoading || !user?.email) ? 'not-allowed' : 'pointer',
                   border: 'none',
-                  background: resetLoading
+                  background: (resetLoading || !user?.email)
                     ? 'rgba(255,255,255,0.05)'
                     : 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)',
                   color: 'white',
-                  boxShadow: resetLoading ? 'none' : '0 4px 16px rgba(226,62,87,0.25)',
+                  boxShadow: (resetLoading || !user?.email) ? 'none' : '0 4px 16px rgba(226,62,87,0.25)',
                   transition: 'all 0.2s',
                   fontFamily: 'inherit',
                 }}
@@ -669,7 +744,7 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
               </div>
 
               <button
-                onClick={() => setDeleteConfirmOpen(true)}
+                onClick={openDeleteModal}
                 style={{
                   padding: '10px 20px',
                   borderRadius: 10,
@@ -698,7 +773,7 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
         </div>
       </div>
 
-      {/* Account Deletion Request Custom Modal */}
+      {/* Account Deletion Confirmation Modal */}
       {deleteConfirmOpen && (
         <div 
           style={{
@@ -708,7 +783,11 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
             padding: 20, zIndex: 10000,
             animation: 'backdropFadeIn 0.2s ease both',
           }} 
-          onClick={() => setDeleteConfirmOpen(false)}
+          onClick={() => {
+            if (!deleteLoading && !deleteSuccess) {
+              setDeleteConfirmOpen(false);
+            }
+          }}
         >
           <div 
             style={{
@@ -720,16 +799,19 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
             }} 
             onClick={e => e.stopPropagation()}
           >
-            <button 
-              onClick={() => setDeleteConfirmOpen(false)} 
-              style={{
-                position: 'absolute', top: 20, right: 20,
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.05)', border: 'none',
-                color: 'rgba(255,255,255,0.6)', fontSize: 16, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >✕</button>
+            {/* Close button */}
+            {!deleteLoading && !deleteSuccess && (
+              <button 
+                onClick={() => setDeleteConfirmOpen(false)} 
+                style={{
+                  position: 'absolute', top: 20, right: 20,
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.05)', border: 'none',
+                  color: 'rgba(255,255,255,0.6)', fontSize: 16, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >✕</button>
+            )}
 
             <div 
               style={{
@@ -740,64 +822,100 @@ export default function SettingsPage({ onNavigate }: SettingsPageProps) {
             />
 
             <h3 style={{ fontSize: 20, fontWeight: 600, color: 'white', marginBottom: 12 }}>
-              Request Account Deletion
+              Delete Account
             </h3>
             
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: '22px', marginBottom: 20 }}>
-              To delete your account and all associated personal data permanently, please email our privacy team from your registered email address.
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: '20px', marginBottom: 20 }}>
+              This action will schedule your account and all associated data (insights, history logs, settings) for permanent deletion. Your account will enter a pending state for a <strong>24-hour grace period</strong>. You can cancel this request anytime during the grace period by simply logging back in.
             </p>
 
-            <div style={{
-              padding: '14px 18px', borderRadius: 12, background: 'rgba(239, 68, 68, 0.04)',
-              border: '1px solid rgba(239, 68, 68, 0.15)', marginBottom: 20
-            }}>
-              <p style={{ fontSize: 13, color: '#fca5a5', lineHeight: '20px', margin: 0 }}>
-                <strong>Send email to:</strong>
-                <br />
-                <a href="mailto:privacy@sumalyze.space?subject=Account%20Deletion%20Request" style={{ color: '#ff8fa3', textDecoration: 'underline', fontWeight: 600 }}>
-                  privacy@sumalyze.space
-                </a>
-                <br />
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', display: 'block', marginTop: 4 }}>
-                  Subject: Account Deletion Request
-                </span>
-              </p>
-            </div>
+            {deleteError && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 9,
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.25)',
+                fontSize: 12, color: '#fca5a5',
+                marginBottom: 20,
+              }}>
+                ⚠ {deleteError}
+              </div>
+            )}
 
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: '20px', marginBottom: 24 }}>
-              For details on how we handle data removal, please review our{' '}
-              <a 
-                href="/data-deletion" 
-                onClick={e => { e.preventDefault(); setDeleteConfirmOpen(false); onNavigate('data-deletion'); }} 
-                style={{ color: '#ff8fa3', textDecoration: 'underline' }}
-              >
-                Data Deletion Policy
-              </a>.
-            </p>
+            {deleteSuccess && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 9,
+                background: 'rgba(52,211,153,0.1)',
+                border: '1px solid rgba(52,211,153,0.25)',
+                fontSize: 13, color: '#6ee7b7',
+                marginBottom: 20,
+              }}>
+                ✓ {deleteSuccess}
+              </div>
+            )}
+
+            {!deleteSuccess && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Please type DELETE to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={e => setDeleteInput(e.target.value)}
+                  placeholder="Type DELETE here"
+                  disabled={deleteLoading}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    background: 'rgba(10,0,15,0.6)',
+                    border: '1px solid rgba(239,68,68,0.3)',
+                    borderRadius: 10,
+                    fontSize: 14,
+                    color: 'white',
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button 
-                onClick={() => setDeleteConfirmOpen(false)} 
-                style={{
-                  padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-                  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-                  color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                Close
-              </button>
-              <a 
-                href="mailto:privacy@sumalyze.space?subject=Account%20Deletion%20Request" 
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 500,
-                  background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)',
-                  color: 'white', textDecoration: 'none',
-                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.25)',
-                }}
-              >
-                Send Email Request
-              </a>
+              {!deleteSuccess && (
+                <button 
+                  onClick={() => setDeleteConfirmOpen(false)} 
+                  disabled={deleteLoading}
+                  style={{
+                    padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+                    border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
+                    color: 'rgba(255,255,255,0.7)', cursor: deleteLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+              {!deleteSuccess && (
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading || deleteInput !== 'DELETE'}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+                    background: (deleteLoading || deleteInput !== 'DELETE')
+                      ? 'rgba(255,255,255,0.05)'
+                      : 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)',
+                    color: (deleteLoading || deleteInput !== 'DELETE') ? 'rgba(255,255,255,0.3)' : 'white',
+                    cursor: (deleteLoading || deleteInput !== 'DELETE') ? 'not-allowed' : 'pointer',
+                    border: 'none',
+                    boxShadow: (deleteLoading || deleteInput !== 'DELETE') ? 'none' : '0 4px 16px rgba(239, 68, 68, 0.25)',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {deleteLoading ? 'Processing Deletion...' : 'Confirm Delete'}
+                </button>
+              )}
             </div>
           </div>
         </div>

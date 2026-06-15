@@ -1,4 +1,5 @@
 // src/utils/fileParser.ts
+import { getFileUploadLimitMB } from '../lib/plans';
 
 /**
  * Dynamic loaders for PDF and DOCX parsers from CDNJS to keep the Vite bundle size minimal.
@@ -37,13 +38,17 @@ export interface FileParseResult {
   error?: string;
 }
 
-export async function parseFile(file: File): Promise<FileParseResult> {
+export async function parseFile(file: File, maxBytes?: number): Promise<FileParseResult> {
   const ext = file.name.split('.').pop()?.toLowerCase();
 
-  // Enforce the 5MB file size limit
-  const maxBytes = 5 * 1024 * 1024;
-  if (file.size > maxBytes) {
-    return { text: '', error: 'File too large. Maximum size is 5MB.' };
+  // Enforce the plan-based or fallback file size limit
+  const finalMaxBytes = maxBytes && maxBytes > 0
+    ? maxBytes
+    : getFileUploadLimitMB('free') * 1024 * 1024;
+
+  if (file.size > finalMaxBytes) {
+    const maxMB = Math.round(finalMaxBytes / (1024 * 1024));
+    return { text: '', error: `File too large. Maximum size is ${maxMB}MB.` };
   }
 
   try {

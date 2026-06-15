@@ -40,7 +40,7 @@ export default function DocumentUpload({
 
     setParsing(true);
     try {
-      const res = await parseFile(file);
+      const res = await parseFile(file, limitMB * 1024 * 1024);
       if (res.error) {
         onError(res.error);
       } else {

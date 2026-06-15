@@ -7,7 +7,7 @@ import {
 } from '../services/ai';
 import { isLimitReached, incrementUsage, getRemainingUses, incrementServerUsage, fetchAndCacheLimits } from '../services/limits';
 import { useAuth } from '../hooks/useAuth';
-import { saveAgentRun, saveOutput } from '../services/database';
+import { saveAgentRun, saveOutput, deleteSavedOutput } from '../services/database';
 import { useToast } from '../components/Toast';
 import DocumentUpload from '../components/DocumentUpload';
 import ExportDropdown from '../components/ExportDropdown';
@@ -122,20 +122,31 @@ function CopyBtn({ text }: { text: string }) {
 function SaveOutputButton({ title, content, type }: { title: string; content: string; type: string }) {
   const { user } = useAuth();
   const toast = useToast();
-  const [saved, setSaved] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
     try {
-      const { error } = await saveOutput(title, content, type);
-      if (error) throw error;
-      setSaved(true);
-      toast.success('Agent output saved successfully!');
-      setTimeout(() => setSaved(false), 3000);
+      if (savedId) {
+        // Unsave/delete from database
+        const { error } = await deleteSavedOutput(savedId);
+        if (error) throw error;
+        setSavedId(null);
+        toast.success('Agent output removed from saved items.');
+      } else {
+        // Save to database
+        const { data, error } = await saveOutput(title, content, type);
+        if (error) throw error;
+        if (data?.id) {
+          setSavedId(data.id);
+        }
+        toast.success('Agent output saved successfully!');
+      }
     } catch (err: any) {
-      toast.error(`Failed to save: ${err.message}`);
+      toast.error(`Operation failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -143,14 +154,33 @@ function SaveOutputButton({ title, content, type }: { title: string; content: st
 
   if (!user) return null;
 
+  const isSaved = !!savedId;
+  const label = saving
+    ? (isSaved ? '⏳ Removing...' : '⏳ Saving...')
+    : (isSaved ? (isHovered ? '✕ Unsave' : '✓ Saved') : '💾 Save');
+
   return (
-    <button onClick={handleSave} disabled={saved || saving} style={{
-      padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
-      border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
-      color: saved ? '#34d399' : 'rgba(255,255,255,0.4)', cursor: saved ? 'default' : 'pointer',
-      transition: 'all 0.2s', fontFamily: 'inherit',
-    }}>
-      {saving ? '⏳ Saving...' : saved ? '✓ Saved' : '💾 Save'}
+    <button
+      onClick={handleSave}
+      disabled={saving}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+        border: isSaved
+          ? `1px solid ${isHovered ? 'rgba(239,68,68,0.2)' : 'rgba(52,211,153,0.2)'}`
+          : '1px solid rgba(255,255,255,0.1)',
+        background: isSaved
+          ? (isHovered ? 'rgba(239,68,68,0.06)' : 'rgba(52,211,153,0.06)')
+          : 'rgba(255,255,255,0.04)',
+        color: isSaved
+          ? (isHovered ? '#fca5a5' : '#34d399')
+          : 'rgba(255,255,255,0.4)',
+        cursor: 'pointer',
+        transition: 'all 0.2s', fontFamily: 'inherit',
+      }}
+    >
+      {label}
     </button>
   );
 }

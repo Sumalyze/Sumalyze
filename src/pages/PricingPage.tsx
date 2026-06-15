@@ -15,7 +15,7 @@ interface PricingPageProps {
 const PLAN_FEATURES: Record<string, { included: string[]; excluded: string[] }> = {
   free: {
     included: [
-      '3 analyses/day limit',
+      '15 analyses/day limit',
       'Core tools access',
       'Last 5 history items',
       'File upload max 2 MB',

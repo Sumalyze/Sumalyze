@@ -5,7 +5,7 @@
 import { useEffect } from 'react';
 import { getToolBySlug, TOOLS } from '../data/tools';
 import { useAuth } from '../hooks/useAuth';
-import { fetchAndCacheLimits } from '../services/limits';
+import { fetchAndCacheLimits, GUEST_DAILY_LIMIT } from '../services/limits';
 import ToolPanel from '../components/ToolPanel';
 
 interface ToolDetailPageProps {
@@ -147,7 +147,7 @@ export default function ToolDetailPage({ slug, onNavigate, onSignIn }: ToolDetai
               background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.15)',
             }}>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                Using as guest · 15 free uses/day ·
+                Using as guest · {GUEST_DAILY_LIMIT} free uses/day ·
               </span>
               <button onClick={onSignIn} style={{
                 fontSize: 12, fontWeight: 600, color: '#a5b4fc',

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { analyzeText } from './utils/mockAnalyzer';
 import type { AnalysisResult } from './utils/mockAnalyzer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { supabase } from './lib/supabase';
 import AuthModal from './components/AuthModal';
 import FeedbackModal from './components/FeedbackModal';
 import LoginPage from './pages/LoginPage';
@@ -11,12 +12,15 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy';
 import RefundPolicy from './pages/RefundPolicy';
+import PayPage from './pages/PayPage';
+import CheckoutPage from './pages/CheckoutPage';
 import BillingTerms from './pages/BillingTerms';
 import DataDeletion from './pages/DataDeletion';
 import SupportPage from './pages/SupportPage';
 import ToolsPage from './pages/ToolsPage';
 import ToolDetailPage from './pages/ToolDetailPage';
 import AgentPage from './pages/AgentPage';
+import NotFoundPage from './pages/NotFoundPage';
 import CookieConsent from './components/CookieConsent';
 import WorkflowsPage from './pages/WorkflowsPage';
 import UseCasesPage from './pages/UseCasesPage';
@@ -26,9 +30,13 @@ import SettingsPage from './pages/SettingsPage';
 import TeamWorkspacePage from './pages/TeamWorkspacePage';
 import MaintenancePage from './pages/MaintenancePage';
 import sumalyzeLogo from './assets/sumalyzelogo.png';
-import { ToastProvider } from './components/Toast';
+import { ToastProvider, useToast } from './components/Toast';
 import { parseFile } from './utils/fileParser';
 import { TOOLS } from './data/tools';
+import TypedLogo from './components/TypedLogo';
+import NavDropdown from './components/NavDropdown';
+import LiquidNavIndicator from './components/LiquidNavIndicator';
+import PageCurtainTransition from './components/PageCurtainTransition';
 import { useCurrentPlan } from './hooks/useCurrentPlan';
 import { getFileUploadLimitMB } from './lib/plans';
 import HeroMockup from './components/HeroMockup';
@@ -45,7 +53,7 @@ import { initAnalytics, captureEvent, capturePageView } from './lib/analytics';
    Sumalyze — AI Clarity Workspace
    ============================================================ */
 
-type Page = 'home' | 'privacy' | 'terms' | 'cookies' | 'refund' | 'billing' | 'data-deletion' | 'support' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing' | 'login' | 'signup' | 'forgot-password' | 'settings' | 'team-workspace';
+type Page = 'home' | 'privacy' | 'terms' | 'cookies' | 'refund' | 'billing' | 'data-deletion' | 'support' | 'tools' | 'tooldetail' | 'agent' | 'workflows' | 'usecases' | 'history' | 'pricing' | 'login' | 'signup' | 'forgot-password' | 'settings' | 'team-workspace' | 'pay' | 'checkout' | 'notfound';
 
 const hashToPathMap: Record<string, string> = {
   tools: '/tools',
@@ -81,6 +89,18 @@ function AppContent() {
   const [authOpen, setAuthOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { user } = useAuth();
+  const toast = useToast();
+
+  const [transitionState, setTransitionState] = useState<'idle' | 'covering' | 'revealing'>('idle');
+  const coveringTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const revealingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (coveringTimeoutRef.current) clearTimeout(coveringTimeoutRef.current);
+      if (revealingTimeoutRef.current) clearTimeout(revealingTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     initAnalytics();
@@ -92,6 +112,44 @@ function AppContent() {
       window.removeEventListener('sumalyze-cookie-consent-changed', handleConsentChange);
     };
   }, []);
+
+  useEffect(() => {
+    async function checkPendingDeletion() {
+      if (!user) return;
+      try {
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('pending_deletion, deletion_requested_at')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.warn('[App] Could not check pending deletion status:', error.message);
+          return;
+        }
+
+        if (profile && profile.pending_deletion) {
+          const { error: cancelError } = await supabase
+            .from('user_profiles')
+            .update({
+              pending_deletion: false,
+              deletion_requested_at: null,
+            })
+            .eq('id', user.id);
+
+          if (!cancelError) {
+            toast.info('Welcome back! Your account deletion request has been canceled.');
+            captureEvent('account_deletion_cancelled');
+          } else {
+            console.error('[App] Failed to cancel deletion request:', cancelError.message);
+          }
+        }
+      } catch (err) {
+        console.error('[App] Exception checking pending deletion:', err);
+      }
+    }
+    checkPendingDeletion();
+  }, [user, toast]);
 
   useEffect(() => {
     const handleGlobalNav = (e: Event) => {
@@ -166,6 +224,10 @@ function AppContent() {
         setPage('data-deletion');
       } else if (path === '/support') {
         setPage('support');
+      } else if (path === '/pay') {
+        setPage('pay');
+      } else if (path === '/checkout') {
+        setPage('checkout');
       } else if (path === '/login') {
         setPage('login');
       } else if (path === '/signup') {
@@ -173,7 +235,7 @@ function AppContent() {
       } else if (path === '/forgot-password') {
         setPage('forgot-password');
       } else {
-        setPage('home');
+        setPage('notfound');
         setToolSlug('');
       }
     };
@@ -186,6 +248,7 @@ function AppContent() {
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
 
   // Auth Redirection: If logged in user is on home, login, or signup, send to tools. If not logged in and on settings, send to login.
+  // Pay/checkout are excluded — accessible without auth for Paddle review.
   useEffect(() => {
     if (user && (page === 'home' || page === 'login' || page === 'signup')) {
       navigate('tools');
@@ -194,25 +257,65 @@ function AppContent() {
     }
   }, [user, page]);
 
-  const navigate = (p: Page) => {
-    let path = '/';
-    if (p === 'usecases') path = '/use-cases';
-    else if (p === 'forgot-password') path = '/forgot-password';
-    else if (p === 'team-workspace') path = '/team-workspace';
-    else if (p !== 'home') path = `/${p}`;
+  const triggerNavigationTransition = (p: Page, toolSlugTarget?: string) => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     
-    if (window.location.pathname !== path) {
-      window.history.pushState(null, '', path);
-      setPage(p);
+    let targetPath = '/';
+    if (p === 'usecases') targetPath = '/use-cases';
+    else if (p === 'forgot-password') targetPath = '/forgot-password';
+    else if (p === 'team-workspace') targetPath = '/team-workspace';
+    else if (p === 'tooldetail' && toolSlugTarget) targetPath = `/tools/${toolSlugTarget}`;
+    else if (p !== 'home') targetPath = `/${p}`;
+
+    if (window.location.pathname === targetPath && (p !== 'tooldetail' || toolSlug === toolSlugTarget)) {
+      return; 
     }
+
+    if (prefersReducedMotion) {
+      if (toolSlugTarget !== undefined) {
+        window.history.pushState(null, '', targetPath);
+        setToolSlug(toolSlugTarget);
+        setPage(p);
+      } else {
+        window.history.pushState(null, '', targetPath);
+        setPage(p);
+      }
+      return;
+    }
+
+    if (transitionState !== 'idle') {
+      return; 
+    }
+
+    setTransitionState('covering');
+    
+    if (coveringTimeoutRef.current) clearTimeout(coveringTimeoutRef.current);
+    coveringTimeoutRef.current = setTimeout(() => {
+      if (toolSlugTarget !== undefined) {
+        window.history.pushState(null, '', targetPath);
+        setToolSlug(toolSlugTarget);
+        setPage(p);
+      } else {
+        window.history.pushState(null, '', targetPath);
+        setPage(p);
+      }
+      
+      setTransitionState('revealing');
+      
+      if (revealingTimeoutRef.current) clearTimeout(revealingTimeoutRef.current);
+      revealingTimeoutRef.current = setTimeout(() => {
+        setTransitionState('idle');
+      }, 380);
+    }, 380);
+  };
+
+  const navigate = (p: Page) => {
+    triggerNavigationTransition(p);
   };
 
   /** Navigate to a specific tool by slug */
   const navigateToTool = (slug: string) => {
-    const path = `/tools/${slug}`;
-    window.history.pushState(null, '', path);
-    setToolSlug(slug);
-    setPage('tooldetail');
+    triggerNavigationTransition('tooldetail', slug);
   };
 
   /** Navigate to any path string (used by ToolDetailPage) */
@@ -224,14 +327,21 @@ function AppContent() {
   };
 
   const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+  // pay/checkout are standalone pages — always accessible for Paddle domain review
+  const isStandalonePage = page === 'pay' || page === 'checkout';
   const isProtectedRoute = ['home', 'tools', 'tooldetail', 'agent', 'workflows', 'history', 'settings', 'login', 'signup', 'forgot-password'].includes(page);
+
+  if (isStandalonePage) {
+    if (page === 'pay') return <PayPage onNavigate={(path) => { window.history.pushState(null, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }} />;
+    if (page === 'checkout') return <CheckoutPage />;
+  }
 
   if (isMaintenanceMode && isProtectedRoute) {
     return <MaintenancePage />;
   }
 
   return (
-    <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
+    <div style={{ background: '#0a000f', color: '#fff', minHeight: '100vh', fontFamily: "var(--font-ui)" }}>
       {isMaintenanceMode ? (
         <div style={{
           width: '100%',
@@ -346,6 +456,11 @@ function AppContent() {
           <ForgotPasswordPage onNavigate={navigate} />
         </div>
       )}
+      {page === 'notfound' && (
+        <div className="page-enter">
+          <NotFoundPage onNavigate={navigate} />
+        </div>
+      )}
       {page === 'home' && (
         <>
           <Hero onNavigate={navigate} />
@@ -361,6 +476,7 @@ function AppContent() {
       <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onNavigate={navigate} />
       <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <CookieConsent />
+      <PageCurtainTransition transitionState={transitionState} />
     </div>
   );
 }
@@ -381,6 +497,10 @@ function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
   const [moreOpen, setMoreOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState<React.CSSProperties>({ opacity: 0 });
+  const navRefs = useRef<Record<string, HTMLButtonElement | HTMLDivElement | null>>({});
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 10);
@@ -406,6 +526,46 @@ function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
     };
   }, [moreOpen, toolsOpen]);
 
+  const activeKey =
+    currentPage === 'home' ? 'home' :
+    (currentPage === 'tools' || currentPage === 'tooldetail') ? 'tools' :
+    currentPage === 'agent' ? 'agent' :
+    currentPage === 'pricing' ? 'pricing' :
+    currentPage === 'history' ? 'history' :
+    ['workflows', 'usecases', 'support', 'privacy', 'terms', 'cookies', 'refund', 'billing', 'data-deletion'].includes(currentPage) ? 'more' :
+    null;
+
+  const targetKey = hoveredKey || activeKey;
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      if (targetKey) {
+        const el = navRefs.current[targetKey];
+        if (el) {
+          setIndicatorStyle({
+            left: el.offsetLeft,
+            width: el.offsetWidth,
+            top: el.offsetTop,
+            height: el.offsetHeight,
+            opacity: 1,
+          });
+          return;
+        }
+      }
+      setIndicatorStyle({ opacity: 0 });
+    };
+
+    updateIndicator();
+    // Tiny delay to ensure layout resolves
+    const t = setTimeout(updateIndicator, 50);
+
+    window.addEventListener('resize', updateIndicator);
+    return () => {
+      window.removeEventListener('resize', updateIndicator);
+      clearTimeout(t);
+    };
+  }, [targetKey, user]);
+
   const moreLinks: { label: string; page?: Page; href?: string; onClick?: () => void }[] = [
     { label: 'Workflows',  page: 'workflows' },
     { label: 'Use Cases',  page: 'usecases' },
@@ -419,110 +579,152 @@ function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
     <header style={{
       position: 'fixed', top: 0, left: 0, width: '100%', zIndex: 100,
       padding: '0 20px',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      background: scrolled ? 'rgba(10,0,15,0.92)' : 'rgba(10,0,15,0.08)',
-      transition: 'background 0.3s ease',
+      background: 'transparent',
+      transition: 'all 0.3s ease',
     }}>
-      <div style={{ maxWidth: 1248, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', position: 'relative' }}>
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, background: 'radial-gradient(62.87% 100% at 50% 100%, rgba(226,62,87,0.15) 0%, transparent 100%)' }} />
-
-        {/* Logo */}
-        <a href="/" onClick={e => { e.preventDefault(); onNavigate('home'); }} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'white', zIndex: 2 }}>
-          <img src={sumalyzeLogo} alt="Sumalyze logo" style={{ width: 32, height: 32, objectFit: 'contain', flexShrink: 0 }} />
-          <span style={{ fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em' }}>Sumalyze</span>
-        </a>
+      <div style={{ maxWidth: 1248, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 0', position: 'relative' }}>
+        
+        {/* Logo and Typed Text */}
+        <TypedLogo 
+          logoUrl={sumalyzeLogo} 
+          onClick={e => { e.preventDefault(); onNavigate('home'); }} 
+        />
 
         {/* Center pill nav — desktop only */}
-        <nav style={{
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(255,255,255,0.015)',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: 8, display: 'flex', alignItems: 'center', padding: '4px 6px', gap: 2,
-        }} className="header-nav-desktop">
+        <nav 
+          style={{
+            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+            background: scrolled ? 'rgba(8, 0, 14, 0.72)' : 'rgba(255,255,255,0.01)',
+            backdropFilter: scrolled ? 'blur(28px) saturate(180%)' : 'none',
+            WebkitBackdropFilter: scrolled ? 'blur(28px) saturate(180%)' : 'none',
+            border: scrolled ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.04)',
+            boxShadow: scrolled ? '0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
+            borderRadius: 12, display: 'flex', alignItems: 'center', padding: '4px 6px', gap: 2,
+            transition: 'background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease',
+          }} 
+          className="header-nav-desktop"
+          onMouseLeave={() => setHoveredKey(null)}
+        >
+          {/* Liquid stretchy active indicator */}
+          <LiquidNavIndicator style={indicatorStyle} />
+
           {/* Home */}
-          <NavPillItem label="Home" active={currentPage === 'home'} onClick={() => onNavigate('home')} />
+          <button
+            ref={el => { navRefs.current['home'] = el; }}
+            onClick={() => onNavigate('home')}
+            onMouseEnter={() => setHoveredKey('home')}
+            onFocus={() => setHoveredKey('home')}
+            onBlur={() => setHoveredKey(null)}
+            style={{
+              fontSize: 13, color: targetKey === 'home' ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: targetKey === 'home' ? 600 : 500,
+              padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'transparent',
+              transition: 'color 0.2s', fontFamily: 'inherit',
+              zIndex: 1,
+            }}
+          >
+            Home
+          </button>
 
           {/* Tools dropdown */}
-          <div style={{ position: 'relative' }} data-tools-dropdown>
+          <div ref={el => { navRefs.current['tools'] = el; }} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center' }} data-tools-dropdown>
             <button
               onClick={() => { setToolsOpen(o => !o); setMoreOpen(false); }}
+              onMouseEnter={() => setHoveredKey('tools')}
+              onFocus={() => setHoveredKey('tools')}
+              onBlur={() => setHoveredKey(null)}
               aria-haspopup="true"
               aria-expanded={toolsOpen}
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 13, color: (toolsOpen || currentPage === 'tools') ? 'white' : 'rgba(255,255,255,0.7)', fontWeight: (toolsOpen || currentPage === 'tools') ? 600 : 500,
-                padding: '6px 12px', borderRadius: 6, background: (toolsOpen || currentPage === 'tools') ? 'rgba(226,62,87,0.1)' : 'transparent',
-                border: 'none', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit',
+                fontSize: 13, color: (toolsOpen || targetKey === 'tools') ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: (toolsOpen || targetKey === 'tools') ? 600 : 500,
+                padding: '6px 12px', borderRadius: 6, background: 'transparent',
+                border: 'none', cursor: 'pointer', transition: 'color 0.2s', fontFamily: 'inherit',
               }}
             >
               Tools
               <span style={{ fontSize: 9, opacity: 0.5, transform: toolsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
             </button>
-            {toolsOpen && (
-              <div data-tools-dropdown style={{
-                position: 'absolute', top: 'calc(100% + 10px)', left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(12,4,20,0.94)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 16, padding: '20px',
-                minWidth: 640,
-                boxShadow: '0 32px 80px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(226,62,87,0.05)',
-                zIndex: 200,
-                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-              }}>
-                {TOOLS.map(tool => (
-                  <button key={tool.id}
-                    onClick={() => { setToolsOpen(false); onNavigateTool(tool.slug); }}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '12px 14px', borderRadius: 12,
-                      background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                      textAlign: 'left', transition: 'background 0.2s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = `${tool.accent}12`}
-                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                  >
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                      background: `${tool.accent}12`, border: `1px solid ${tool.accent}20`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: tool.accent
-                    }}>
-                      {tool.icon}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: 'white', margin: 0, lineHeight: '1.2' }}>{tool.name}</p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', margin: '3px 0 0', lineHeight: '1.4' }}>{tool.description}</p>
-                    </div>
-                  </button>
-                ))}
-                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0', paddingTop: 10 }}>
-                  <button onClick={() => { setToolsOpen(false); onNavigate('tools'); }}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(226,62,87,0.08)', border: '1px solid rgba(226,62,87,0.2)', color: '#ff8fa3', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    View all tools →
-                  </button>
-                </div>
-              </div>
-            )}
+            <NavDropdown
+              isOpen={toolsOpen}
+              onClose={() => setToolsOpen(false)}
+              onNavigate={onNavigate}
+              onNavigateTool={onNavigateTool}
+              currentPage={currentPage}
+              tools={TOOLS}
+            />
           </div>
 
-          <NavPillItem label="Agent" active={currentPage === 'agent'} onClick={() => onNavigate('agent')} />
-          <NavPillItem label="Pricing" active={currentPage === 'pricing'} onClick={() => onNavigate('pricing')} />
+          {/* Agent */}
+          <button
+            ref={el => { navRefs.current['agent'] = el; }}
+            onClick={() => onNavigate('agent')}
+            onMouseEnter={() => setHoveredKey('agent')}
+            onFocus={() => setHoveredKey('agent')}
+            onBlur={() => setHoveredKey(null)}
+            style={{
+              fontSize: 13, color: targetKey === 'agent' ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: targetKey === 'agent' ? 600 : 500,
+              padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'transparent',
+              transition: 'color 0.2s', fontFamily: 'inherit',
+              zIndex: 1,
+            }}
+          >
+            Agent
+          </button>
+
+          {/* Pricing */}
+          <button
+            ref={el => { navRefs.current['pricing'] = el; }}
+            onClick={() => onNavigate('pricing')}
+            onMouseEnter={() => setHoveredKey('pricing')}
+            onFocus={() => setHoveredKey('pricing')}
+            onBlur={() => setHoveredKey(null)}
+            style={{
+              fontSize: 13, color: targetKey === 'pricing' ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: targetKey === 'pricing' ? 600 : 500,
+              padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'transparent',
+              transition: 'color 0.2s', fontFamily: 'inherit',
+              zIndex: 1,
+            }}
+          >
+            Pricing
+          </button>
+
+          {/* History */}
           {user && (
-            <NavPillItem label="History" active={currentPage === 'history'} onClick={() => onNavigate('history')} />
+            <button
+              ref={el => { navRefs.current['history'] = el; }}
+              onClick={() => onNavigate('history')}
+              onMouseEnter={() => setHoveredKey('history')}
+              onFocus={() => setHoveredKey('history')}
+              onBlur={() => setHoveredKey(null)}
+              style={{
+                fontSize: 13, color: targetKey === 'history' ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: targetKey === 'history' ? 600 : 500,
+                padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: 'transparent',
+                transition: 'color 0.2s', fontFamily: 'inherit',
+                zIndex: 1,
+              }}
+            >
+              History
+            </button>
           )}
+
           {/* More dropdown */}
-          <div style={{ position: 'relative' }} data-more-dropdown>
+          <div ref={el => { navRefs.current['more'] = el; }} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center' }} data-more-dropdown>
             <button
               onClick={() => setMoreOpen(o => !o)}
+              onMouseEnter={() => setHoveredKey('more')}
+              onFocus={() => setHoveredKey('more')}
+              onBlur={() => setHoveredKey(null)}
               aria-haspopup="true"
               aria-expanded={moreOpen}
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 13, color: moreOpen ? 'white' : 'rgba(255,255,255,0.7)', fontWeight: 500,
-                padding: '6px 12px', borderRadius: 6, background: moreOpen ? 'rgba(226,62,87,0.08)' : 'transparent',
-                border: 'none', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit',
+                fontSize: 13, color: (moreOpen || targetKey === 'more') ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: (moreOpen || targetKey === 'more') ? 600 : 500,
+                padding: '6px 12px', borderRadius: 6, background: 'transparent',
+                border: 'none', cursor: 'pointer', transition: 'color 0.2s', fontFamily: 'inherit',
               }}
             >
               More
@@ -530,8 +732,8 @@ function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
             </button>
             {moreOpen && (
               <div className="nav-dropdown" data-more-dropdown style={{
-                position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(14,4,22,0.97)', border: '1px solid rgba(255,255,255,0.1)',
+                position: 'absolute', top: 'calc(100% + 12px)', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(10,3,15,0.96)', border: '1px solid rgba(255,255,255,0.08)',
                 borderRadius: 12, padding: '6px', minWidth: 160,
                 boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
                 zIndex: 200,
@@ -562,49 +764,82 @@ function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
         </nav>
 
         {/* Desktop actions */}
-        <div className="header-nav-desktop" style={{ display: 'flex', alignItems: 'center', gap: 10, zIndex: 2 }}>
+        <div className="header-nav-desktop" style={{
+          display: 'flex', alignItems: 'center', gap: 10, zIndex: 2,
+          background: scrolled ? 'rgba(8, 0, 14, 0.72)' : 'transparent',
+          backdropFilter: scrolled ? 'blur(28px) saturate(180%)' : 'none',
+          WebkitBackdropFilter: scrolled ? 'blur(28px) saturate(180%)' : 'none',
+          border: scrolled ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
+          boxShadow: scrolled ? '0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)' : 'none',
+          borderRadius: 12,
+          padding: scrolled ? '4px 6px' : '4px 0',
+          transition: 'all 0.4s ease',
+        }}>
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button onClick={() => onNavigate('settings')} style={{
-                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
-                background: currentPage === 'settings' ? 'rgba(226,62,87,0.1)' : 'rgba(255,255,255,0.04)',
-                color: currentPage === 'settings' ? '#ff8fa3' : 'rgba(255,255,255,0.8)',
-                fontFamily: 'inherit',
-              }}>
+              <button 
+                onClick={() => onNavigate('settings')} 
+                style={{
+                  padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer', border: '1px solid transparent',
+                  background: currentPage === 'settings' ? 'rgba(226,62,87,0.08)' : 'transparent',
+                  color: currentPage === 'settings' ? '#ff8fa3' : 'rgba(255,255,255,0.8)',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { if (currentPage !== 'settings') { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'white'; } }}
+                onMouseLeave={e => { if (currentPage !== 'settings') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; } }}
+              >
                 Settings
               </button>
-              <button onClick={() => { captureEvent('logout_clicked'); signOut(); }} style={{
-                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)',
-                fontFamily: 'inherit',
-              }}>
+              <button 
+                onClick={() => { captureEvent('logout_clicked'); signOut(); }} 
+                style={{
+                  padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer', border: '1px solid transparent',
+                  background: 'transparent', color: 'rgba(255,255,255,0.5)',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'white'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+              >
                 Sign Out
               </button>
             </div>
           ) : (
             <>
-              <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Sign In', location: 'Header', destination: 'login' }); onNavigate('login'); }} style={{
-                padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.03)',
-                color: 'rgba(255,255,255,0.8)', fontFamily: 'inherit',
-              }}>
+              <button 
+                onClick={() => { captureEvent('cta_clicked', { cta_name: 'Sign In', location: 'Header', destination: 'login' }); onNavigate('login'); }} 
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer', border: '1px solid transparent',
+                  background: 'transparent',
+                  color: 'rgba(255,255,255,0.8)', fontFamily: 'inherit',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'white'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.background = 'transparent'; }}
+              >
                 Sign In
               </button>
-              <button onClick={() => { captureEvent('cta_clicked', { cta_name: 'Sign Up', location: 'Header', destination: 'signup' }); onNavigate('signup'); }} style={{
-                padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', border: '1px solid rgba(207,184,255,0.2)',
-                background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)',
-                boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)',
-                color: '#f4f0ff', fontFamily: 'inherit',
-              }}>
+              <button 
+                onClick={() => { captureEvent('cta_clicked', { cta_name: 'Sign Up', location: 'Header', destination: 'signup' }); onNavigate('signup'); }} 
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer', border: '1px solid rgba(226,62,87,0.3)',
+                  background: 'rgba(226,62,87,0.08)',
+                  boxShadow: '0 0 12px rgba(226,62,87,0.1)',
+                  color: '#ff8fa3', fontFamily: 'inherit',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(226,62,87,0.18)'; e.currentTarget.style.borderColor = 'rgba(226,62,87,0.5)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(226,62,87,0.08)'; e.currentTarget.style.borderColor = 'rgba(226,62,87,0.3)'; }}
+              >
                 Sign Up
               </button>
             </>
           )}
-          <HeaderBtn onClick={() => { captureEvent('cta_clicked', { cta_name: 'Try Agent', location: 'Header', destination: 'agent' }); onNavigate('agent'); }}>Try Agent ✧</HeaderBtn>
         </div>
 
         {/* Mobile: hamburger */}
@@ -759,43 +994,6 @@ function Header({ onNavigate, onNavigateTool, onFeedbackClick, currentPage }: {
   );
 }
 
-/* Shared nav pill item */
-function NavPillItem({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{
-      fontSize: 13, color: active ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: active ? 600 : 500,
-      padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-      background: active ? 'rgba(226,62,87,0.1)' : 'transparent',
-      transition: 'all 0.2s', fontFamily: 'inherit',
-    }}
-      onMouseEnter={e => { if (!active) { e.currentTarget.style.color = 'white'; e.currentTarget.style.background = 'rgba(226,62,87,0.05)'; } }}
-      onMouseLeave={e => { if (!active) { e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; e.currentTarget.style.background = 'transparent'; } }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function HeaderBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
-  return (
-    <button onClick={onClick}
-      className="hover-glow"
-      style={{
-        display: 'block', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, color: '#f4f0ff',
-        position: 'relative',
-        background: 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)',
-        boxShadow: 'inset 0 0 12px rgba(191,151,255,0.24)',
-        backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(207,184,255,0.2)',
-        cursor: 'pointer', fontFamily: 'inherit',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.42) 100%), rgba(113,47,255,0.24)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(180deg, rgba(60,8,126,0) 0%, rgba(60,8,126,0.32) 100%), rgba(113,47,255,0.12)'; }}>
-      {children}
-    </button>
-  );
-}
-
 
 
 
@@ -842,7 +1040,7 @@ function Hero({ onNavigate }: { onNavigate: (p: Page) => void }) {
               </button>
             </div>
 
-            <p className="animate-reveal delay-300" style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0, fontStyle: 'italic' }}>
+            <p className="animate-reveal delay-300" style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0, fontStyle: 'italic', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.2)', textUnderlineOffset: '3px' }}>
               Less blah. More aha.
             </p>
           </div>
@@ -899,7 +1097,7 @@ function DemoSection({ onNavigate, onSignUpClick }: { onNavigate: (p: Page) => v
 /* ============================================================
    DEMO PANEL
    ============================================================ */
-const GUEST_DAILY_LIMIT = 10;
+const GUEST_DAILY_LIMIT = 3;
 const MAX_TEXT = 5000;
 function _getUsageToday(): number {
   try {
@@ -1011,7 +1209,7 @@ function DemoPanel({ onSignUpClick }: { onSignUpClick: () => void }) {
     setUploadedFileName(null);
 
     try {
-      const res = await parseFile(file);
+      const res = await parseFile(file, limitMB * 1024 * 1024);
       if (res.error) {
         setError(res.error);
         return;
@@ -1128,7 +1326,7 @@ function DemoPanel({ onSignUpClick }: { onSignUpClick: () => void }) {
 
             {isLimitReached && (
               <div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', fontSize: 13, color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span>Daily MVP free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for unlimited access.</span>
+                <span>Daily MVP free limit reached ({GUEST_DAILY_LIMIT} analyses). Sign in for 15 free analyses per day.</span>
               </div>
             )}
             <button onClick={analyze} disabled={!canAnalyze}

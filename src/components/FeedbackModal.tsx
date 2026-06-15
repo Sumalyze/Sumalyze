@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { saveUserFeedback } from '../services/database';
 import { useAuth } from '../hooks/useAuth';
 import sumalyzeLogo from '../assets/sumalyzelogo.png';
 import { captureEvent } from '../lib/analytics';
-import TurnstileWidget from './TurnstileWidget';
+import TurnstileWidget, { TurnstileWidgetRef } from './TurnstileWidget';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -23,6 +23,8 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileKey, setTurnstileKey] = useState(0);
+  const [turnstileExpired, setTurnstileExpired] = useState(false);
+  const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
   const isTurnstileRequired = !!import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const canSubmit = message.trim().length > 0 && (!isTurnstileRequired || !!turnstileToken) && !loading;
@@ -30,6 +32,13 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   useEffect(() => {
     if (isOpen) {
       captureEvent('feedback_modal_opened');
+      setFeedbackType('suggestion');
+      setMessage('');
+      setRating(null);
+      setError(null);
+      setSuccess(null);
+      setTurnstileToken(null);
+      setTurnstileExpired(false);
     }
   }, [isOpen]);
 
@@ -54,6 +63,11 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
     if (rating !== null && (rating < 1 || rating > 5)) {
       setError('Rating must be between 1 and 5.');
+      return;
+    }
+
+    if (isTurnstileRequired && !turnstileToken) {
+      setError('Please complete the security check.');
       return;
     }
 
@@ -102,10 +116,15 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       setMessage('');
       setRating(null);
       setTurnstileToken(null);
+      setTurnstileExpired(false);
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
       setTurnstileToken(null);
-      setTurnstileKey(prev => prev + 1);
+      if (turnstileRef.current) {
+        turnstileRef.current.reset();
+      } else {
+        setTurnstileKey(prev => prev + 1);
+      }
     } finally {
       setLoading(false);
     }
@@ -329,13 +348,53 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               </div>
             )}
 
+            {/* Turnstile Expiration Alert */}
+            {turnstileExpired && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 9,
+                background: 'rgba(239,68,68,0.06)',
+                border: '1px solid rgba(239,68,68,0.20)',
+                fontSize: 12, color: '#fca5a5',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <span>Verification expired. Please click refresh to verify again.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (turnstileRef.current) {
+                      turnstileRef.current.reset();
+                    } else {
+                      setTurnstileKey(prev => prev + 1);
+                    }
+                    setTurnstileExpired(false);
+                  }}
+                  style={{
+                    background: 'none', border: 'none', color: '#ff8fa3', cursor: 'pointer', fontWeight: 600, fontSize: 11, padding: '2px 6px', textDecoration: 'underline', fontFamily: 'inherit'
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
+
             {/* Cloudflare Turnstile Verification */}
             {isTurnstileRequired && (
               <TurnstileWidget
+                ref={turnstileRef}
                 key={turnstileKey}
-                onSuccess={(token) => setTurnstileToken(token)}
-                onExpire={() => setTurnstileToken(null)}
-                onError={() => setTurnstileToken(null)}
+                onSuccess={(token) => {
+                  setTurnstileToken(token);
+                  setTurnstileExpired(false);
+                }}
+                onExpire={() => {
+                  setTurnstileToken(null);
+                  setTurnstileExpired(true);
+                }}
+                onError={() => {
+                  setTurnstileToken(null);
+                  setTurnstileExpired(true);
+                }}
               />
             )}
 

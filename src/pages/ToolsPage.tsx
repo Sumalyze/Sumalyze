@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TOOLS, type ToolDef } from '../data/tools';
-import { fetchAndCacheLimits } from '../services/limits';
+import { fetchAndCacheLimits, GUEST_DAILY_LIMIT } from '../services/limits';
 import { useAuth } from '../hooks/useAuth';
 import ToolPanel from '../components/ToolPanel';
 
@@ -159,7 +159,7 @@ export default function ToolsPage({
         {!isLoggedIn && (
           <div style={{ marginBottom: 32, padding: '14px 20px', borderRadius: 12, background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: 0 }}>
-              Using tools as guest · <strong style={{ color: 'white' }}>15 free tool uses per day</strong> · Sign in for more
+              Using tools as guest · <strong style={{ color: 'white' }}>{GUEST_DAILY_LIMIT} free tool uses per day</strong> · Sign in for more
             </p>
             <button onClick={onSignIn} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, border: 'none', background: 'linear-gradient(135deg, #E23E57 0%, #88304E 100%)', color: 'white', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(226,62,87,0.3)' }}>
               Sign In Free

@@ -31,13 +31,13 @@ export const PLANS: Plan[] = [
     description: 'For quick summaries and basic understanding.',
     cta: 'Start free',
     limits: {
-      analysesPerDay: 3,
+      analysesPerDay: 15,
       agentRunsPerMonth: 0,
       fileUploadMaxMB: 2,
       historyCount: 5,
       exports: ['Copy', 'TXT', 'Markdown'],
       features: [
-        '3 analyses/day limit',
+        '15 analyses/day limit',
         'No Agent Mode access',
         'File upload max 2 MB',
         'Last 5 analyses history logs',
@@ -162,7 +162,7 @@ export function getDailyLimit(plan: string): number {
   if (p === 'starter') return 10;
   if (p === 'pro') return 30;
   if (p === 'max') return 80;
-  return 3; // free
+  return 15; // free
 }
 
 export function getFileUploadLimitMB(plan: string): number {

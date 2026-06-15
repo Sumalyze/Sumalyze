@@ -7,7 +7,7 @@ import type { ToolDef } from '../data/tools';
 import { runSingleTool, type ToolResult } from '../services/ai';
 import { isLimitReached, incrementUsage, getRemainingUses, incrementServerUsage } from '../services/limits';
 import { useAuth } from '../hooks/useAuth';
-import { saveAnalysisHistory, saveOutput } from '../services/database';
+import { saveAnalysisHistory, saveOutput, deleteSavedOutput } from '../services/database';
 import { useToast } from './Toast';
 import DocumentUpload from './DocumentUpload';
 import { captureEvent, getInputLengthBucket, getFileSizeBucket, getDurationBucket } from '../lib/analytics';
@@ -58,25 +58,36 @@ export function CopyButton({ text, toolName }: { text: string; toolName?: string
 export function SaveOutputButton({ title, content, type, toolName }: { title: string; content: string; type: string; toolName?: string }) {
   const { user } = useAuth();
   const toast = useToast();
-  const [saved, setSaved] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
     try {
-      const { error } = await saveOutput(title, content, type);
-      if (error) throw error;
-      setSaved(true);
-      captureEvent('export_clicked', {
-        format: 'database',
-        tool_name: toolName || title,
-        plan: 'free',
-      });
-      toast.success('Clarity report saved successfully!');
-      setTimeout(() => setSaved(false), 3000);
+      if (savedId) {
+        // Unsave/delete from database
+        const { error } = await deleteSavedOutput(savedId);
+        if (error) throw error;
+        setSavedId(null);
+        toast.success('Clarity report removed from saved items.');
+      } else {
+        // Save to database
+        const { data, error } = await saveOutput(title, content, type);
+        if (error) throw error;
+        if (data?.id) {
+          setSavedId(data.id);
+        }
+        captureEvent('export_clicked', {
+          format: 'database',
+          tool_name: toolName || title,
+          plan: 'free',
+        });
+        toast.success('Clarity report saved successfully!');
+      }
     } catch (err: any) {
-      toast.error(`Failed to save: ${err.message}`);
+      toast.error(`Operation failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -84,14 +95,33 @@ export function SaveOutputButton({ title, content, type, toolName }: { title: st
 
   if (!user) return null;
 
+  const isSaved = !!savedId;
+  const label = saving
+    ? (isSaved ? '⏳ Removing...' : '⏳ Saving...')
+    : (isSaved ? (isHovered ? '✕ Unsave' : '✓ Saved') : '💾 Save Output');
+
   return (
-    <button onClick={handleSave} disabled={saved || saving} style={{
-      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 500,
-      border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
-      color: saved ? '#34d399' : 'rgba(255,255,255,0.5)', cursor: saved ? 'default' : 'pointer',
-      transition: 'all 0.2s', fontFamily: 'inherit',
-    }}>
-      {saving ? '⏳ Saving...' : saved ? '✓ Saved' : '💾 Save Output'}
+    <button
+      onClick={handleSave}
+      disabled={saving}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 500,
+        border: isSaved
+          ? `1px solid ${isHovered ? 'rgba(239,68,68,0.2)' : 'rgba(52,211,153,0.2)'}`
+          : '1px solid rgba(255,255,255,0.1)',
+        background: isSaved
+          ? (isHovered ? 'rgba(239,68,68,0.06)' : 'rgba(52,211,153,0.06)')
+          : 'rgba(255,255,255,0.04)',
+        color: isSaved
+          ? (isHovered ? '#fca5a5' : '#34d399')
+          : 'rgba(255,255,255,0.5)',
+        cursor: 'pointer',
+        transition: 'all 0.2s', fontFamily: 'inherit',
+      }}
+    >
+      {label}
     </button>
   );
 }

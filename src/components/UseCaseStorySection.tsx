@@ -1,7 +1,418 @@
 import { useEffect, useRef, useState } from 'react';
 
-const STORY_SECTION_HEIGHT = '300vh'; // Easily adjustable constant for storytelling scroll duration
+const STORY_SECTION_HEIGHT = '300vh';
+const SLIDER_MIN = 8;
+const SLIDER_MAX = 92;
 
+/* ─────────────────────────────────────────────────────────────
+   Before panels — dark, muted, messy
+───────────────────────────────────────────────────────────── */
+function BeforePanel({ 
+  title, 
+  meta, 
+  lines, 
+  accentMeta, 
+  compact 
+}: { 
+  title: string; 
+  meta: string; 
+  lines: string[]; 
+  accentMeta: string; 
+  compact: boolean;
+}) {
+  return (
+    <div style={{ 
+      position: 'absolute', 
+      inset: 0, 
+      background: 'rgb(5,2,12)', 
+      padding: compact ? '36px 14px 14px' : '46px 20px 20px', 
+      overflow: 'hidden', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: 0 
+    }}>
+      <div style={{ 
+        fontSize: compact ? 9.5 : 10.5, 
+        fontWeight: 700, 
+        color: 'rgba(255,255,255,0.38)', 
+        marginBottom: 3, 
+        whiteSpace: 'nowrap', 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis',
+        letterSpacing: '0.02em'
+      }}>
+        {title}
+      </div>
+      <div style={{ 
+        fontSize: compact ? 8 : 8.5, 
+        fontWeight: 600, 
+        color: accentMeta, 
+        marginBottom: compact ? 10 : 14,
+        letterSpacing: '0.05em',
+        textTransform: 'uppercase'
+      }}>
+        {meta}
+      </div>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: compact ? 6 : 8,
+        flex: 1,
+        overflow: 'hidden'
+      }}>
+        {lines.map((line, i) => (
+          <div key={i} style={{ 
+            fontSize: compact ? 9.5 : 10.5, 
+            color: 'rgba(255,255,255,0.3)', 
+            lineHeight: 1.35,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            borderLeft: '2px solid rgba(255, 255, 255, 0.05)',
+            paddingLeft: 8
+          }}>
+            {line}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   After panels — clean, structured, accent-colored
+───────────────────────────────────────────────────────────── */
+function AfterPanel({ 
+  title, 
+  items, 
+  footer, 
+  accent, 
+  compact 
+}: { 
+  title: string; 
+  items: { icon: string; text: string }[]; 
+  footer: string; 
+  accent: string; 
+  compact: boolean;
+}) {
+  return (
+    <div style={{ 
+      position: 'absolute', 
+      inset: 0, 
+      background: 'rgb(8,4,18)', 
+      padding: compact ? '36px 14px 14px' : '46px 20px 20px', 
+      overflow: 'hidden', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: 0 
+    }}>
+      <div style={{ 
+        fontSize: compact ? 9.5 : 10.5, 
+        fontWeight: 700, 
+        color: accent, 
+        marginBottom: compact ? 10 : 14, 
+        whiteSpace: 'nowrap', 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis',
+        letterSpacing: '0.03em'
+      }}>
+        {title}
+      </div>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: compact ? 6 : 8,
+        flex: 1
+      }}>
+        {items.map((item, i) => (
+          <div key={i} style={{
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            gap: compact ? 8 : 10,
+            padding: compact ? '5px 8px' : '7px 11px', 
+            borderRadius: 6,
+            background: `${accent}0a`, 
+            border: `1px solid ${accent}1c`,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.01)',
+            minWidth: 0,
+          }}>
+            <span style={{ 
+              fontSize: compact ? 10 : 11, 
+              color: accent, 
+              flexShrink: 0, 
+              marginTop: 0.5 
+            }}>{item.icon}</span>
+            <span style={{ 
+              fontSize: compact ? 9.5 : 10.5, 
+              color: 'rgba(255,255,255,0.85)', 
+              fontWeight: 500, 
+              lineHeight: 1.35,
+              wordBreak: 'break-word'
+            }}>{item.text}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ 
+        marginTop: 'auto', 
+        fontSize: compact ? 8 : 8.5, 
+        color: `${accent}aa`, 
+        fontStyle: 'italic', 
+        whiteSpace: 'nowrap', 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis',
+        letterSpacing: '0.01em'
+      }}>
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Content data
+───────────────────────────────────────────────────────────── */
+interface PanelData {
+  before: { title: string; meta: string; lines: string[]; accentMeta: string };
+  after:  { title: string; items: { icon: string; text: string }[]; footer: string };
+}
+
+const PANEL_DATA: Record<string, PanelData> = {
+  Students: {
+    before: { 
+      title: 'Textbook chapter', 
+      meta: '1,200 pages', 
+      accentMeta: 'rgba(255,143,163,0.55)', 
+      lines: [
+        'Cellular respiration is the process by which cells convert glucose into usable energy.',
+        'Glycolysis begins in the cytoplasm and produces pyruvate.',
+        'The Krebs cycle continues inside the mitochondria.',
+        'Electron transport creates most ATP through oxidative phosphorylation.',
+        'Key definitions are scattered across multiple sections.'
+      ] 
+    },
+    after:  { 
+      title: '1-page study brief', 
+      items: [
+        { icon: '📌', text: 'Key definitions extracted' },
+        { icon: '🧠', text: 'Core ideas grouped' },
+        { icon: '🗂', text: 'Flashcards ready' }
+      ], 
+      footer: 'Study faster, not longer.' 
+    },
+  },
+  Founders: {
+    before: { 
+      title: 'Contract draft', 
+      meta: 'Legal document', 
+      accentMeta: 'rgba(129,140,248,0.55)', 
+      lines: [
+        'Either party may terminate this agreement with written notice.',
+        'Liability shall be limited except in cases of gross negligence.',
+        'Renewal occurs automatically unless cancelled before the renewal date.',
+        'Service credits are the sole remedy for downtime.',
+        'Payment terms apply regardless of implementation delays.'
+      ] 
+    },
+    after:  { 
+      title: '3 risks found', 
+      items: [
+        { icon: '⚠️', text: 'Termination clause risk' },
+        { icon: '🛡', text: 'Liability cap missing' },
+        { icon: '⏱', text: 'Renewal deadline' }
+      ], 
+      footer: 'Review before Friday.' 
+    },
+  },
+  Creators: {
+    before: { 
+      title: 'Sponsor messages', 
+      meta: 'Mixed feedback', 
+      accentMeta: 'rgba(52,211,153,0.55)', 
+      lines: [
+        'Hey, love your content and maybe we can collaborate next month.',
+        'We need two posts, one story, and possibly a short video.',
+        'Budget is flexible but we need quick turnaround.',
+        'Can you also make it feel natural and not too sponsored?',
+        'Let us know your rate and timeline.'
+      ] 
+    },
+    after:  { 
+      title: 'Reply ready', 
+      items: [
+        { icon: '💬', text: 'Tone: Polite' },
+        { icon: '🎯', text: 'Core ask extracted' },
+        { icon: '🗓', text: 'Timeline clarified' }
+      ], 
+      footer: 'Send a cleaner reply.' 
+    },
+  },
+  'Busy Teams': {
+    before: { 
+      title: 'Long thread', 
+      meta: '32 messages', 
+      accentMeta: 'rgba(167,139,250,0.55)', 
+      lines: [
+        'Can someone check the pricing page before launch?',
+        'Figma assets are still missing from the shared folder.',
+        'I think the deadline moved but I cannot find the message.',
+        'We also need final copy for the onboarding screen.',
+        'Who owns the support page update?'
+      ] 
+    },
+    after:  { 
+      title: 'Task list', 
+      items: [
+        { icon: '💸', text: 'Review pricing' },
+        { icon: '📁', text: 'Send assets' },
+        { icon: '✅', text: 'Confirm deadline' }
+      ], 
+      footer: 'Everyone knows the next step.' 
+    },
+  },
+};
+
+/* ─────────────────────────────────────────────────────────────
+   BeforeAfterSlider
+   TWO-PANEL stationary approach using clip-path
+───────────────────────────────────────────────────────────── */
+interface SliderProps {
+  title: string;
+  accent: string;
+  reducedMotion: boolean;
+  compact?: boolean;
+}
+
+function BeforeAfterSlider({ title, accent, reducedMotion, compact = false }: SliderProps) {
+  const [pct, setPct] = useState(50);
+  const [dragging, setDragging] = useState(false);
+  const [hintVisible, setHintVisible] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const data = PANEL_DATA[title];
+
+  const clamp = (v: number) => Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, v));
+
+  const getPct = (clientX: number) => {
+    const el = containerRef.current;
+    if (!el) return 50;
+    const { left, width } = el.getBoundingClientRect();
+    return clamp(((clientX - left) / width) * 100);
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.focus();
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    setDragging(true);
+    setHintVisible(false);
+    setPct(getPct(e.clientX));
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    setPct(getPct(e.clientX));
+  };
+
+  const onPointerUp = () => setDragging(false);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); setPct(p => clamp(p - 5)); setHintVisible(false); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); setPct(p => clamp(p + 5)); setHintVisible(false); }
+  };
+
+  const t = (reducedMotion || dragging) ? 'none' : 'left 0.15s ease-out, clip-path 0.15s ease-out';
+
+  return (
+    <div
+      ref={containerRef}
+      role="slider"
+      aria-label="Compare before and after"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={SLIDER_MIN}
+      aria-valuemax={SLIDER_MAX}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onFocus={() => setHintVisible(false)}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', cursor: dragging ? 'ew-resize' : 'col-resize', userSelect: 'none', touchAction: 'none', outline: 'none' }}
+    >
+      {/* ── LEFT: Before panel (stationary, clip-path) ── */}
+      <div style={{ position: 'absolute', inset: 0, clipPath: `inset(0 ${100 - pct}% 0 0)`, transition: t }}>
+        <BeforePanel {...data.before} compact={compact} />
+      </div>
+
+      {/* ── RIGHT: After panel (stationary, clip-path) ── */}
+      <div style={{ position: 'absolute', inset: 0, clipPath: `inset(0 0 0 ${pct}%)`, transition: t }}>
+        <AfterPanel {...data.after} accent={accent} compact={compact} />
+      </div>
+
+      {/* ── Divider line ── */}
+      <div style={{
+        position: 'absolute', top: 0, bottom: 0,
+        left: `${pct}%`, transform: 'translateX(-50%)',
+        width: 1.5,
+        background: 'rgba(255,255,255,0.55)',
+        pointerEvents: 'none', zIndex: 10,
+        transition: t,
+      }} />
+
+      {/* ── Handle (visual only) ── */}
+      <div
+        style={{
+          position: 'absolute', top: '50%', left: `${pct}%`,
+          transform: 'translate(-50%, -50%)',
+          width: 30, height: 30, borderRadius: '50%',
+          background: 'rgb(5,2,12)',
+          border: `2px solid ${accent}`,
+          boxShadow: dragging ? `0 0 0 5px ${accent}45` : `0 0 0 3px ${accent}25, 0 2px 8px rgba(0,0,0,0.7)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'ew-resize', zIndex: 20, outline: 'none',
+          transition: t,
+        }}
+      >
+        <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+          <path d="M3.5 4H1M1 4L3 1.5M1 4L3 6.5" stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M8.5 4H11M11 4L9 1.5M11 4L9 6.5" stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+
+      {/* ── Labels — z-index 30, always readable ── */}
+      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 30, pointerEvents: 'none' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 4, background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(255,255,255,0.3)', display: 'block' }} />
+          <span style={{ fontSize: 8.5, fontWeight: 700, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Before</span>
+        </div>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.22)', paddingLeft: 3, marginTop: 2 }}>Messy input</div>
+      </div>
+
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 30, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 4, background: 'rgba(0,0,0,0.75)', border: `1px solid ${accent}45` }}>
+          <span style={{ width: 4, height: 4, borderRadius: '50%', background: accent, display: 'block' }} />
+          <span style={{ fontSize: 8.5, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.1em' }}>After</span>
+        </div>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.22)', paddingRight: 3, marginTop: 2 }}>Clear output</div>
+      </div>
+
+      {/* ── Hint ── */}
+      {hintVisible && (
+        <div style={{
+          position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 30, pointerEvents: 'none',
+          background: 'rgba(4,1,12,0.82)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 5, padding: '3px 10px',
+          fontSize: 9, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap',
+        }}>
+          Drag to compare
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+/* ─────────────────────────────────────────────────────────────
+   UseCase data
+───────────────────────────────────────────────────────────── */
 interface UseCase {
   title: string;
   icon: string;
@@ -9,356 +420,102 @@ interface UseCase {
   bullets: string[];
   cta: string;
   accent: string;
-  mockup: React.ReactNode;
 }
 
+const USE_CASES: UseCase[] = [
+  { title: 'Students',    icon: '🎓', accent: '#ff8fa3', cta: 'See study workspace', desc: 'Understand heavy reading lists immediately.', bullets: ['Analyze long PDFs & textbooks instantly', 'Extract definitions and core hypotheses', 'Auto-generate study flashcards & briefs'] },
+  { title: 'Founders',   icon: '💼', accent: '#818cf8', cta: 'See legal analyzer',   desc: 'Spot contract risks before you sign.',       bullets: ['Locate silent termination and liability clauses', 'Extract binding deadlines & follow-ups', 'Identify negotiation leverage and risks'] },
+  { title: 'Creators',   icon: '✍️', accent: '#34d399', cta: 'See reply tuner',      desc: 'Manage sponsor deals and feedback.',          bullets: ['Analyze feedback and sponsor inquiries', 'Extract core demands and deal timelines', 'Generate polite professional replies instantly'] },
+  { title: 'Busy Teams', icon: '⚡', accent: '#a78bfa', cta: 'See task workspace',   desc: 'Turn long messages into actions.',            bullets: ['Turn Slack/email storm into task checklists', 'Extract deadlines and responsible assignees', 'Strip corporate greeting fluff and summaries'] },
+];
+
+/* ─────────────────────────────────────────────────────────────
+   Main export
+───────────────────────────────────────────────────────────── */
 export default function UseCaseStorySection() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const progressRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const progressRefs  = useRef<(HTMLDivElement | null)[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile,    setIsMobile]    = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [sliderKey,   setSliderKey]   = useState(0);
+  const prevActiveRef = useRef(activeIndex);
 
-  // Define mockups for each segment
-  const useCases: UseCase[] = [
-    {
-      title: 'Students',
-      icon: '🎓',
-      desc: 'Understand heavy reading lists immediately.',
-      bullets: [
-        'Analyze long PDFs & textbooks instantly',
-        'Extract definitions and core hypotheses',
-        'Auto-generate study flashcards & briefs',
-      ],
-      cta: 'See study workspace',
-      accent: '#ff8fa3',
-      mockup: (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%', background: '#0e0517', padding: '30px', boxSizing: 'border-box' }}>
-          {/* Graphical Flow: Giant text stack -> Arrow -> Distilled page */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24, width: '100%', justifyContent: 'space-around' }}>
-            
-            {/* Input Stack Representation */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 90, height: 110, border: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(255,255,255,0.01)', borderRadius: 8, position: 'relative', display: 'flex', flexDirection: 'column', padding: 10, gap: 6 }}>
-                {/* Visual lines representation of heavy text */}
-                <div style={{ width: '80%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-                <div style={{ width: '90%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-                <div style={{ width: '70%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-                <div style={{ width: '85%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-                <div style={{ width: '60%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-                {/* Stack shadow pages behind it */}
-                <div style={{ position: 'absolute', top: 4, left: 4, width: '100%', height: '100%', border: '1px solid rgba(255, 255, 255, 0.04)', background: 'rgba(255,255,255,0.005)', borderRadius: 8, zIndex: -1 }} />
-                <div style={{ position: 'absolute', top: 8, left: 8, width: '100%', height: '100%', border: '1px solid rgba(255, 255, 255, 0.02)', background: 'rgba(255,255,255,0.002)', borderRadius: 8, zIndex: -2 }} />
-              </div>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>1,200 Pages</span>
-            </div>
-
-            {/* Glowing Action Arrow */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div style={{ fontSize: 24, color: '#ff8fa3', animation: 'premiumPulse 1.5s infinite' }}>➔</div>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Distill</span>
-            </div>
-
-            {/* Output Distilled Brief Representation */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 110, height: 110, border: '1px solid rgba(255, 143, 163, 0.25)', background: 'rgba(255, 143, 163, 0.04)', borderRadius: 12, display: 'flex', flexDirection: 'column', padding: 12, gap: 10, justifyContent: 'center', boxShadow: '0 8px 24px rgba(255, 143, 163, 0.08)' }}>
-                {/* 2 Clean Checkmark lines */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff8fa3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 'bold' }}>✓</div>
-                  <div style={{ width: 50, height: 4, background: '#fff', borderRadius: 2 }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff8fa3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 'bold' }}>✓</div>
-                  <div style={{ width: 40, height: 4, background: '#fff', borderRadius: 2 }} />
-                </div>
-              </div>
-              <span style={{ fontSize: 11, color: '#ff8fa3', fontWeight: 600 }}>1 Page Brief</span>
-            </div>
-
-          </div>
-        </div>
-      )
-    },
-    {
-      title: 'Founders',
-      icon: '💼',
-      desc: 'Spot contract risks and deadlines.',
-      bullets: [
-        'Locate silent termination and liability clauses',
-        'Extract binding deadlines & follow-ups',
-        'Identify negotiation leverage and risks',
-      ],
-      cta: 'See legal analyzer',
-      accent: '#818cf8',
-      mockup: (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%', background: '#070514', padding: '30px', boxSizing: 'border-box' }}>
-          {/* Graphical representation: contract document with pop-up risk warning boxes */}
-          <div style={{ display: 'flex', gap: 20, width: '100%', alignItems: 'center' }}>
-            
-            {/* Abstract Contract Layout */}
-            <div style={{ flex: 1.1, height: 150, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.01)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ width: 50, height: 5, background: 'rgba(255,255,255,0.2)', borderRadius: 2, marginBottom: 4 }} />
-              <div style={{ width: '90%', height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }} />
-              <div style={{ width: '85%', height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }} />
-              <div style={{ width: '95%', height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }} />
-              <div style={{ width: '40%', height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }} />
-            </div>
-
-            {/* Glowing Risk Alerts */}
-            <div style={{ flex: 1.3, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 16px rgba(239, 68, 68, 0.1)' }}>
-                <span style={{ fontSize: 14 }}>🚨</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5', letterSpacing: '0.02em' }}>Termination Clause Risk</span>
-              </div>
-              <div style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 16px rgba(251, 191, 36, 0.1)' }}>
-                <span style={{ fontSize: 14 }}>⚠️</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fde68a', letterSpacing: '0.02em' }}>Liability Cap Missing</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )
-    },
-    {
-      title: 'Creators',
-      icon: '✍️',
-      desc: 'Manage sponsor deals and feedback.',
-      bullets: [
-        'Analyze feedback and sponsor inquiries',
-        'Extract core demands and deal timelines',
-        'Generate polite professional replies instantly',
-      ],
-      cta: 'See reply tuner',
-      accent: '#34d399',
-      mockup: (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%', background: '#040b12', padding: '30px', boxSizing: 'border-box' }}>
-          {/* Graphical representation: abstract feedback balloons to a tone indicator dial */}
-          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-around', alignItems: 'center', gap: 16 }}>
-            
-            {/* Abstract Bubble Comments */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '40%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 8, borderRadius: '10px 10px 10px 0', width: '100%' }}>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                <div style={{ width: '70%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 8, borderRadius: '10px 10px 10px 0', width: '90%' }}>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                <div style={{ width: '50%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-              </div>
-            </div>
-
-            {/* Neon Connection */}
-            <div style={{ fontSize: 20, color: '#34d399' }}>➔</div>
-
-            {/* Graphical Tone Dial (Metric Circle) */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 90,
-                height: 90,
-                borderRadius: '50%',
-                border: '6px solid rgba(52, 211, 153, 0.08)',
-                borderTopColor: '#34d399',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 16px rgba(52, 211, 153, 0.15)',
-                position: 'relative'
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Polite</span>
-                <span style={{ fontSize: 9, color: '#34d399', position: 'absolute', bottom: 12 }}>92%</span>
-              </div>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tone Checked</span>
-            </div>
-
-          </div>
-        </div>
-      )
-    },
-    {
-      title: 'Busy Teams',
-      icon: '⚡',
-      desc: 'Turn long messages into actions.',
-      bullets: [
-        'Turn Slack/email storm into task checklists',
-        'Extract deadlines and responsible assignees',
-        'Strip corporate greeting fluff and summaries',
-      ],
-      cta: 'See task workspace',
-      accent: '#a78bfa',
-      mockup: (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%', background: '#0e0417', padding: '30px', boxSizing: 'border-box' }}>
-          {/* Graphical representation: message blocks triage to task checklist with avatars */}
-          <div style={{ display: 'flex', gap: 20, width: '100%', alignItems: 'center' }}>
-            
-            {/* Input Chat Bubbles */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-              <div style={{ width: '90%', height: 36, background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ width: 35, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
-                <div style={{ width: '80%', height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
-              </div>
-              <div style={{ width: '100%', height: 36, background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ width: 25, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 1 }} />
-                <div style={{ width: '70%', height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
-              </div>
-            </div>
-
-            {/* Arrow */}
-            <div style={{ fontSize: 20, color: '#a78bfa' }}>➔</div>
-
-            {/* Checklist items with assignees */}
-            <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(167, 139, 250, 0.05)', border: '1px solid rgba(167, 139, 250, 0.18)', padding: '8px 10px', borderRadius: 8 }}>
-                <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 'bold' }}>✓</span>
-                <span style={{ fontSize: 11, color: 'white', fontWeight: 500, flexGrow: 1 }}>Figma Assets</span>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#a78bfa', color: '#000', fontSize: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>S</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(167, 139, 250, 0.05)', border: '1px solid rgba(167, 139, 250, 0.18)', padding: '8px 10px', borderRadius: 8 }}>
-                <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 'bold' }}>✓</span>
-                <span style={{ fontSize: 11, color: 'white', fontWeight: 500, flexGrow: 1 }}>Review pricing</span>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#a78bfa', color: '#000', fontSize: 8, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>J</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )
+  // Reset slider on use-case change
+  useEffect(() => {
+    if (prevActiveRef.current !== activeIndex) {
+      prevActiveRef.current = activeIndex;
+      setSliderKey(k => k + 1);
     }
-  ];
+  }, [activeIndex]);
 
   useEffect(() => {
-    const checkViewport = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    const checkMotion = () => {
-      setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    };
-
-    checkViewport();
-    checkMotion();
-
-    window.addEventListener('resize', checkViewport, { passive: true });
-    return () => window.removeEventListener('resize', checkViewport);
+    const checkVP = () => setIsMobile(window.innerWidth < 768);
+    const checkRM = () => setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    checkVP(); checkRM();
+    window.addEventListener('resize', checkVP, { passive: true });
+    return () => window.removeEventListener('resize', checkVP);
   }, []);
 
   useEffect(() => {
     if (isMobile || reducedMotion) return;
-
     let ticking = false;
 
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          updateActiveIndex();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    const updateActiveIndex = () => {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const rect = container.getBoundingClientRect();
-      const containerTop = rect.top + window.scrollY;
-      const containerHeight = rect.height;
-      const windowHeight = window.innerHeight;
-
-      const start = containerTop;
-      const end = containerTop + containerHeight - windowHeight;
-
-      const currentScroll = window.scrollY;
-      let progress = 0;
-
-      if (currentScroll > start) {
-        progress = (currentScroll - start) / (end - start);
-      }
-      progress = Math.max(0, Math.min(1, progress));
-
-      // 4 use cases, map 0..1 to 0..3
-      const targetIndex = Math.min(3, Math.floor(progress * 4));
-      
-      // Update state ONLY if the index actually changes (highly optimized)
-      setActiveIndex(prev => (prev !== targetIndex ? targetIndex : prev));
-
-      // Update progress bar widths directly in the DOM for smooth scrolling performance
+    const update = () => {
+      const c = containerRef.current;
+      if (!c) return;
+      const { top } = c.getBoundingClientRect();
+      const cTop   = top + window.scrollY;
+      const cH     = c.getBoundingClientRect().height;
+      const wH     = window.innerHeight;
+      let prog = window.scrollY > cTop ? (window.scrollY - cTop) / (cH - wH) : 0;
+      prog = Math.max(0, Math.min(1, prog));
+      const idx = Math.min(3, Math.floor(prog * 4));
+      setActiveIndex(prev => prev !== idx ? idx : prev);
       for (let i = 0; i < 4; i++) {
         const bar = progressRefs.current[i];
         if (!bar) continue;
-
-        const startSeg = i * 0.25;
-        const endSeg = (i + 1) * 0.25;
-        let fill = 0;
-
-        if (progress >= endSeg) {
-          fill = 100;
-        } else if (progress <= startSeg) {
-          fill = 0;
-        } else {
-          fill = ((progress - startSeg) / 0.25) * 100;
-        }
-
-        const innerBar = bar.firstElementChild as HTMLDivElement;
-        if (innerBar) {
-          innerBar.style.width = `${fill}%`;
-        }
+        const s = i * 0.25, e = (i + 1) * 0.25;
+        let fill = prog >= e ? 100 : prog > s ? ((prog - s) / 0.25) * 100 : 0;
+        (bar.firstElementChild as HTMLDivElement | null)?.style && ((bar.firstElementChild as HTMLDivElement).style.width = `${fill}%`);
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    updateActiveIndex();
-
-    return () => window.removeEventListener('scroll', handleScroll);
+    const onScroll = () => { if (!ticking) { requestAnimationFrame(() => { update(); ticking = false; }); ticking = true; } };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    update();
+    return () => window.removeEventListener('scroll', onScroll);
   }, [isMobile, reducedMotion]);
 
-  if (isMobile || reducedMotion) {
-    /* Mobile/Reduced-motion Layout: Standard clean stacked visual list */
-    return (
-      <section style={{ padding: '40px 20px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: '1.1', letterSpacing: '-0.03em', textAlign: 'center', margin: '0 0 12px', background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.7) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent' }}>
-            Built for people who hate long text
-          </h2>
-          <p style={{ fontSize: 15, color: 'rgba(239,237,253,0.6)', lineHeight: '24px', maxWidth: 640, margin: '0 auto 36px', textAlign: 'center' }}>
-            We don't suffer from a lack of information. We suffer from too much text, hidden noise, and unclear next steps. Sumalyze strips the clutter.
-          </p>
+  const cur = USE_CASES[activeIndex];
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {useCases.map((item) => (
-              <div key={item.title} style={{
-                background: 'rgba(255,255,255,0.015)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 12,
-                padding: '24px',
-                display: 'grid',
-                gridTemplateColumns: '1fr',
-                gap: 20,
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 24 }}>{item.icon}</span>
-                    <h3 style={{ fontSize: 18, fontWeight: 600, color: 'white', margin: 0 }}>{item.title}</h3>
-                  </div>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: '20px', margin: 0 }}>{item.desc}</p>
-                  <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0 12px' }}>
-                    {item.bullets.map((bullet, idx) => (
-                      <li key={idx} style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: item.accent }}>✓</span> {bullet}
-                      </li>
-                    ))}
-                  </ul>
+  /* ── Mobile ── */
+  if (isMobile || reducedMotion) {
+    return (
+      <section style={{ padding: '48px 20px 40px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ maxWidth: 800, margin: '0 auto' }}>
+          <h2 style={{ fontWeight: 500, fontSize: 'clamp(24px,5vw,34px)', lineHeight: '1.1', letterSpacing: '-0.03em', textAlign: 'center', margin: '0 0 10px', background: 'linear-gradient(180deg,#fff 0%,rgba(255,255,255,0.65) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent' }}>
+            Built for people who hate long text.
+          </h2>
+          <p style={{ fontSize: 14, color: 'rgba(239,237,253,0.5)', lineHeight: '22px', maxWidth: 480, margin: '0 auto 28px', textAlign: 'center' }}>
+            Strip the clutter. Keep what matters.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {USE_CASES.map(item => (
+              <div key={item.title} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>{item.icon}</span>
+                  <h3 style={{ fontSize: 15, fontWeight: 600, color: 'white', margin: 0 }}>{item.title}</h3>
                 </div>
-                {/* Visualizer Mockup Panel */}
-                <div style={{
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                  borderRadius: 12,
-                  minHeight: 240,
-                  overflow: 'hidden',
-                  position: 'relative'
-                }}>
-                  {item.mockup}
+                <ul style={{ display: 'flex', flexDirection: 'column', gap: 5, margin: 0 }}>
+                  {item.bullets.map((b, i) => (
+                    <li key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span style={{ color: item.accent, fontWeight: 700 }}>✓</span> {b}
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ height: 260, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', position: 'relative' }}>
+                  <BeforeAfterSlider key={item.title} title={item.title} accent={item.accent} reducedMotion={reducedMotion} />
                 </div>
               </div>
             ))}
@@ -368,112 +525,73 @@ export default function UseCaseStorySection() {
     );
   }
 
-  /* Desktop Sticky storytelling visual layout */
+  /* ── Desktop ── */
   return (
-    <div ref={containerRef} style={{ height: STORY_SECTION_HEIGHT, position: 'relative', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-      <div style={{ position: 'sticky', top: '80px', height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ maxWidth: 1400, width: '100%', margin: '0 auto', padding: '0 40px', display: 'grid', gridTemplateColumns: '1fr 1.20fr', gap: '80px', alignItems: 'center' }}>
-          
-          {/* Left panel: text content */}
+    <div ref={containerRef} style={{ height: STORY_SECTION_HEIGHT, position: 'relative', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ position: 'sticky', top: '72px', height: 'calc(100vh - 72px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ maxWidth: 1280, width: '100%', margin: '0 auto', padding: '0 40px', display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: '64px', alignItems: 'center' }}>
+
+          {/* Left text */}
           <div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 12 }}>
               Workspace Use Cases
             </span>
-            <h2 style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: '1.15', letterSpacing: '-0.03em', color: 'white', margin: '0 0 24px' }}>
+            <h2 style={{ fontWeight: 500, fontSize: 'clamp(26px,3vw,40px)', lineHeight: '1.15', letterSpacing: '-0.03em', color: 'white', margin: '0 0 28px' }}>
               Built for people who hate long text.
             </h2>
-            
-            {/* Active content panel */}
-            <div style={{ minHeight: 260, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ minHeight: 240, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 28 }}>{useCases[activeIndex].icon}</span>
-                <span style={{ fontSize: 22, fontWeight: 600, color: 'white' }}>{useCases[activeIndex].title}</span>
+                <span style={{ fontSize: 24 }}>{cur.icon}</span>
+                <span style={{ fontSize: 19, fontWeight: 600, color: 'white' }}>{cur.title}</span>
               </div>
-              
-              <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', lineHeight: '26px', margin: 0 }}>
-                {useCases[activeIndex].desc}
-              </p>
-
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '8px 0' }}>
-                {useCases[activeIndex].bullets.map((bullet, idx) => (
-                  <li key={idx} style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ color: useCases[activeIndex].accent, fontWeight: 'bold' }}>✓</span> {bullet}
+              <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.52)', lineHeight: '23px', margin: 0 }}>{cur.desc}</p>
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: 9, margin: '4px 0' }}>
+                {cur.bullets.map((b, i) => (
+                  <li key={i} style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: cur.accent, fontWeight: 700 }}>✓</span> {b}
                   </li>
                 ))}
               </ul>
-
-              <div style={{ marginTop: 12 }}>
-                <button style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: useCases[activeIndex].accent,
-                  background: `${useCases[activeIndex].accent}12`,
-                  border: `1px solid ${useCases[activeIndex].accent}24`,
-                  padding: '10px 20px',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = `${useCases[activeIndex].accent}22`; }}
-                onMouseLeave={e => { e.currentTarget.style.background = `${useCases[activeIndex].accent}12`; }}>
-                  {useCases[activeIndex].cta} →
+              <div style={{ marginTop: 6 }}>
+                <button
+                  style={{ fontSize: 13, fontWeight: 600, color: cur.accent, background: `${cur.accent}12`, border: `1px solid ${cur.accent}24`, padding: '9px 18px', borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = `${cur.accent}22`; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = `${cur.accent}12`; }}
+                >
+                  {cur.cta} →
                 </button>
               </div>
             </div>
-
-            {/* Step Indicators / Progress Bars */}
-            <div style={{ display: 'flex', gap: 12, marginTop: 40 }}>
-              {useCases.map((item, idx) => (
-                <div 
-                  key={idx} 
-                  ref={el => { progressRefs.current[idx] = el; }}
-                  style={{
-                    width: 48,
-                    height: 4,
-                    borderRadius: 2,
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <div style={{
-                    width: activeIndex >= idx ? '100%' : '0%',
-                    height: '100%',
-                    background: item.accent,
-                    borderRadius: 2,
-                    transition: 'background-color 0.3s ease'
-                  }} />
+            {/* Progress bars */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 40 }}>
+              {USE_CASES.map((item, idx) => (
+                <div key={idx} ref={el => { progressRefs.current[idx] = el; }} style={{ width: 44, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: activeIndex >= idx ? '100%' : '0%', height: '100%', background: item.accent, borderRadius: 2, transition: 'background-color 0.3s' }} />
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Right panel: illustration / mockups */}
+          {/* Right: slider box */}
           <div style={{
-            position: 'relative',
-            height: 480,
-            background: 'linear-gradient(135deg, rgba(20, 10, 30, 0.4) 0%, rgba(10, 5, 20, 0.6) 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            borderRadius: 12,
-            overflow: 'hidden',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+            position: 'relative', height: 440,
+            border: `1px solid rgba(255,255,255,0.08)`,
+            borderRadius: 14, overflow: 'hidden',
+            boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px ${cur.accent}0e`,
+            transition: 'box-shadow 0.5s ease',
           }}>
-            {/* Display the active mockup frame with smooth fade transitions */}
-            {useCases.map((item, idx) => (
-              <div
-                key={idx}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  opacity: activeIndex === idx ? 1 : 0,
-                  visibility: activeIndex === idx ? 'visible' : 'hidden',
-                  transition: 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s ease',
-                }}
-              >
-                {item.mockup}
+            {/* Top accent bar */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 5, pointerEvents: 'none', background: `linear-gradient(90deg,${cur.accent}bb,${cur.accent}00)`, transition: 'background 0.5s' }} />
+
+            {/* Fade between use-cases */}
+            {USE_CASES.map((item, idx) => (
+              <div key={idx} style={{
+                position: 'absolute', inset: 0,
+                opacity: activeIndex === idx ? 1 : 0,
+                visibility: activeIndex === idx ? 'visible' : 'hidden',
+                transition: 'opacity 0.45s cubic-bezier(0.16,1,0.3,1), visibility 0.45s',
+              }}>
+                <BeforeAfterSlider key={`${idx}-${sliderKey}`} title={item.title} accent={item.accent} reducedMotion={reducedMotion} />
               </div>
             ))}
           </div>

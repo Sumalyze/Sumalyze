@@ -23,7 +23,7 @@ export default function TrustSection() {
       <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         
         {/* The Privacy Card */}
-        <div style={{
+        <div className="restore-fonts" style={{
           width: '100%',
           background: 'radial-gradient(100% 100% at 50% 0%, rgba(129, 140, 248, 0.05) 0%, rgba(10, 0, 15, 0.4) 100%)',
           border: '1px solid rgba(129, 140, 248, 0.16)',

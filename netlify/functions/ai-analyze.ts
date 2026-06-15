@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { rateLimitAnalyze } from './_utils/rateLimit';
 
 // Sumalyze — AI Secure Serverless Analysis Function
 // netlify/functions/ai-analyze.ts
@@ -14,12 +15,6 @@ interface NLEvent {
   headers: Record<string, string | undefined>;
 }
 
-// ─── Rate Limiting Configuration & State ────────────────────────────────
-const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
-const WINDOW_MS = 60 * 1000; // 60 seconds
-const MAX_REQUESTS = 5;      // 5 requests per minute
-const MAX_MAP_SIZE = 1000;   // Prune map if it grows beyond 1000 entries
-
 function getHeaderCaseInsensitive(headers: Record<string, string | undefined>, name: string): string | undefined {
   const target = name.toLowerCase();
   for (const key of Object.keys(headers)) {
@@ -28,29 +23,6 @@ function getHeaderCaseInsensitive(headers: Record<string, string | undefined>, n
     }
   }
   return undefined;
-}
-
-function getClientIp(event: NLEvent): string {
-  const headers = event.headers || {};
-
-  // 1. x-nf-client-connection-ip
-  let ip = getHeaderCaseInsensitive(headers, 'x-nf-client-connection-ip');
-  if (ip) return ip.trim();
-
-  // 2. client-ip
-  ip = getHeaderCaseInsensitive(headers, 'client-ip');
-  if (ip) return ip.trim();
-
-  // 3. x-forwarded-for
-  const xForwardedFor = getHeaderCaseInsensitive(headers, 'x-forwarded-for');
-  if (xForwardedFor) {
-    const parts = xForwardedFor.split(',');
-    if (parts.length > 0 && parts[0]) {
-      return parts[0].trim();
-    }
-  }
-
-  return 'unknown';
 }
 interface NLResponse {
   statusCode: number;
@@ -343,55 +315,6 @@ async function tryOpenRouter(prompt: string, systemInstruction: string, apiKey: 
   }
 }
 
-async function checkUpstashRateLimit(ip: string): Promise<{ allowed: boolean; count?: number }> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  
-  if (!url || !token) {
-    return { allowed: true }; // Upstash not configured -> fall back to local Map
-  }
-
-  const key = `sumalyze:ratelimit:${ip}`;
-  try {
-    const res = await fetch(`${url}/pipeline`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify([
-        ['INCR', key],
-        ['TTL', key],
-      ]),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Upstash API returned status ${res.status}`);
-    }
-
-    const data = (await res.json()) as Array<{ result: number; error?: string }>;
-    if (data[0]?.error) throw new Error(data[0].error);
-
-    const count = data[0].result;
-    const ttl = data[1].result;
-
-    // Set TTL on key creation (when TTL is -1)
-    if (ttl === -1) {
-      await fetch(`${url}/expire/${key}/60`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    }
-
-    if (count > MAX_REQUESTS) {
-      return { allowed: false, count };
-    }
-    return { allowed: true, count };
-  } catch (err: any) {
-    console.warn('[ai-analyze] Upstash Redis rate limiting call failed, falling back to local memory rate limiting:', err.message);
-    return { allowed: true };
-  }
-}
 
 
 // ─── Main Handler ──────────────────────────────────────────────────────────
@@ -405,9 +328,9 @@ export const handler = async (event: NLEvent): Promise<NLResponse> => {
     return json(405, { error: 'Method not allowed' });
   }
 
-  // Check if user is logged in (authenticated) to exempt them from rate limits
+  // Check if user is logged in (authenticated) to identify user limits
   const authHeader = getHeaderCaseInsensitive(event.headers, 'authorization');
-  let isGuest = true;
+  let userId: string | undefined = undefined;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
@@ -421,7 +344,7 @@ export const handler = async (event: NLEvent): Promise<NLResponse> => {
         });
         const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
         if (!authError && user) {
-          isGuest = false;
+          userId = user.id;
         } else if (authError) {
           console.warn('[ai-analyze] Guest token validation failed, falling back to IP rate limit:', authError.message);
         }
@@ -431,55 +354,13 @@ export const handler = async (event: NLEvent): Promise<NLResponse> => {
     }
   }
 
-  // TODO: Add Cloudflare Turnstile/CAPTCHA verification here in the future
-  // if (isGuest) {
-  //   const turnstileToken = getHeaderCaseInsensitive(event.headers, 'x-turnstile-token');
-  //   await verifyTurnstile(turnstileToken);
-  // }
-
-  if (isGuest) {
-    const ip = getClientIp(event);
-    let allowed = true;
-    let usedUpstash = false;
-
-    // 1. Try Upstash Redis Rate Limiting if configured
-    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-      const upstashRes = await checkUpstashRateLimit(ip);
-      if (upstashRes.allowed === false) {
-        console.warn(`[ai-analyze] Guest IP ${ip} rate limited by Upstash Redis. Count: ${upstashRes.count}`);
-        return json(429, { error: 'Rate limit reached. Please wait a moment or sign in to increase your limits.' });
-      }
-      if (upstashRes.count !== undefined) {
-        usedUpstash = true;
-      }
-    }
-
-    // 2. Fallback to in-memory rate limiting if Upstash wasn't configured or failed
-    if (!usedUpstash) {
-      const now = Date.now();
-
-      // Prune rateLimitMap if it exceeds limit size to prevent memory leaks
-      if (rateLimitMap.size > MAX_MAP_SIZE) {
-        for (const [key, record] of rateLimitMap.entries()) {
-          if (now - record.windowStart > WINDOW_MS) {
-            rateLimitMap.delete(key);
-          }
-        }
-      }
-
-      const record = rateLimitMap.get(ip);
-      if (!record) {
-        rateLimitMap.set(ip, { count: 1, windowStart: now });
-      } else if (now - record.windowStart > WINDOW_MS) {
-        record.count = 1;
-        record.windowStart = now;
-      } else if (record.count >= MAX_REQUESTS) {
-        console.warn(`[ai-analyze] Guest IP ${ip} rate limited by in-memory fallback. Count: ${record.count}`);
-        return json(429, { error: 'Rate limit reached. Please wait a moment or sign in to increase your limits.' });
-      } else {
-        record.count += 1;
-      }
-    }
+  // Centralized Rate Limiter check (for both guests and logged-in users)
+  const rateLimitResult = await rateLimitAnalyze(event, userId);
+  if (!rateLimitResult.allowed) {
+    console.warn(`[ai-analyze] Rate limit reached. User ID: ${userId || 'guest'}`);
+    const status = rateLimitResult.statusCode || 429;
+    const errorMsg = rateLimitResult.error || 'Rate limit reached. Please wait a moment or sign in to increase your limits.';
+    return json(status, { error: errorMsg });
   }
 
 
